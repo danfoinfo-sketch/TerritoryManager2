@@ -1091,9 +1091,10 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     }
 
       // Handle highlighting based on mode
+      console.log('🖱️ Handling mode - localAddModeTerritoryId:', localAddModeTerritoryIdRef.current);
       if (!localAddModeTerritoryIdRef.current) {
-        // Not in add mode - highlight just this ZIP
-        console.log('🖱️ Not in add mode - highlighting single ZIP:', zipCode);
+        // Not in add mode - highlight just this ZIP and show tooltip
+        console.log('🖱️ ENTERING: Not in add mode - highlighting single ZIP:', zipCode);
         // Comprehensive type safety check for single ZIP
         const normalizedZipCode = String(zipCode);
         console.log('Single ZIP validation - Original:', typeof zipCode, zipCode, 'Normalized:', typeof normalizedZipCode, normalizedZipCode);
@@ -1101,6 +1102,18 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           console.warn('🖱️ ZIP type coercion applied - was:', zipCode, 'now:', normalizedZipCode);
         }
         setSelectedZips([zipCode]);
+
+        // Show tooltip for the selected ZIP
+        const cachedData = apiCache.get(zipCode);
+        const isEstimated = cachedData?.estimated || false;
+        console.log('🖱️ Setting popup info for single ZIP:', { zip: zipCode, cachedData: !!cachedData, estimated: isEstimated, population: cachedData?.population });
+        setPopupInfo({
+          zip: zipCode,
+          lngLat: e.lngLat,
+          population: cachedData?.population || 0,
+          standAloneHouses: cachedData?.standAloneHouses || 0,
+          estimated: isEstimated
+        });
 
         // Update the highlight layer filter immediately (type-safe)
         if (mapRef.current) {
