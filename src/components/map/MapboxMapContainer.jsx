@@ -20,6 +20,26 @@ import * as turf from "@turf/turf";
 import { fetchZipPopulationAndHouses, apiCache } from "./censusApi";
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+// Add global styles for proper map sizing and spinner animation
+const globalStyles = `
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// Inject the CSS
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = globalStyles;
+  document.head.appendChild(style);
+}
+
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || 'your-mapbox-token-here';
 const hasValidToken = MAPBOX_ACCESS_TOKEN && MAPBOX_ACCESS_TOKEN !== 'your-mapbox-token-here' && MAPBOX_ACCESS_TOKEN.length > 10;
 console.log('🗺️ Mapbox access token configured:', hasValidToken ? 'YES' : 'NO/MISSING');
@@ -41,9 +61,11 @@ export default forwardRef(function MapboxMapContainer({
   showBoundaries = true,
 }, ref) {
   const mapRef = useRef(null);
+  const mapContainerRef = useRef(null);
   const [loadingZips, setLoadingZips] = useState(false);
   const [popupInfo, setPopupInfo] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
   const [territoryTooltip, setTerritoryTooltip] = useState(null); // For hover tooltips
   const [selectedTerritoryPopup, setSelectedTerritoryPopup] = useState(null); // For selected territory persistent tooltip
 
@@ -2513,6 +2535,41 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     // No ZIP limit checking needed - zoom levels handle visibility
   }, []);
 
+  // Check container dimensions and set containerReady
+  useEffect(() => {
+    const checkContainer = () => {
+      if (mapContainerRef.current) {
+        const rect = mapContainerRef.current.getBoundingClientRect();
+        const hasDimensions = rect.width > 0 && rect.height > 0;
+        console.log('🗺️ Map container dimensions:', rect.width, 'x', rect.height, 'has dimensions:', hasDimensions);
+
+        if (hasDimensions && !containerReady) {
+          setContainerReady(true);
+          console.log('🗺️ Container ready, map can now render');
+        }
+      }
+    };
+
+    // Check immediately
+    checkContainer();
+
+    // Check again after layout has settled
+    const timeout = setTimeout(checkContainer, 100);
+
+    return () => clearTimeout(timeout);
+  }, [containerReady]);
+
+  // Force resize when container becomes ready
+  useEffect(() => {
+    if (containerReady && mapRef.current) {
+      const map = mapRef.current.getMap();
+      if (map) {
+        console.log('Forced map.resize() after container became ready');
+        map.resize();
+      }
+    }
+  }, [containerReady]);
+
   console.log('🗺️ MapboxMapContainer rendering, mapLoaded:', mapLoaded);
 
 
@@ -2549,10 +2606,11 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
   return (
     <div
+      ref={mapContainerRef}
       className="map-container"
       style={{
-        height: 'calc(100vh - 0px)', // Force calculation
-        width: 'calc(100vw - 0px)',  // Force calculation
+        height: '100vh',
+        width: '100vw',
         position: 'relative',
         backgroundColor: mapLoaded ? 'transparent' : '#f5f5dc', // Tan background while loading
         minHeight: '400px',
@@ -2574,7 +2632,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         </div>
       )}
 
-      <Map
+      {containerReady && (
+        <Map
         ref={mapRef}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
         initialViewState={viewport}
@@ -2622,21 +2681,13 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           console.error('🗺️ Map tile error:', e);
           setMapLoaded(false);
         }}
-        onRender={() => {
-          // Force resize on every render to ensure proper sizing
-          if (mapRef.current) {
-            const map = mapRef.current.getMap();
-            if (map) {
-              map.resize();
-            }
-          }
-        }}
         interactiveLayerIds={['zip-fills-new']}
       >
         <NavigationControl position="top-right" />
 
         {/* States layer removed temporarily - causing 404 */}
-      </Map>
+        </Map>
+      )}
 
       {/* Loading indicator */}
       {loadingZips && (
