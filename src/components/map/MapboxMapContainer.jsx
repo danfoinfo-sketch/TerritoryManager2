@@ -954,7 +954,6 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         <div style="font-size: 0.9em; color: #666;">${stats.zipCount} ZIPs</div>
       `;
 
-      console.log('🔍 FINAL POPUP HTML:', popupHtml);
       console.log('🔍 Generated popup HTML:', popupHtml);
 
       try {
