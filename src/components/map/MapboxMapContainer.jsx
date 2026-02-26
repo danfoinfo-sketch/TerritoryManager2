@@ -715,8 +715,68 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     };
   }, []);
 
+  // Helper function to check if vector source is loaded
+  const isVectorSourceLoaded = useCallback((map) => {
+    try {
+      const source = map.getSource(VECTOR_SOURCE_ID);
+      if (!source) {
+        console.log('🔍 Vector source not found');
+        return false;
+      }
+
+      // Check if source has loaded tiles
+      const sourceCache = source._source && source._source._tileCache;
+      if (!sourceCache) {
+        console.log('🔍 Vector source cache not available');
+        return false;
+      }
+
+      // Check if we have any loaded tiles
+      const loadedTiles = Object.keys(sourceCache._tiles || {});
+      console.log('🔍 Vector source has', loadedTiles.length, 'loaded tiles');
+
+      return loadedTiles.length > 0;
+    } catch (error) {
+      console.error('🔍 Error checking source loaded state:', error);
+      return false;
+    }
+  }, []);
+
+  // Helper function to wait for vector source to load
+  const waitForVectorSource = useCallback((map, timeout = 5000) => {
+    return new Promise((resolve) => {
+      if (isVectorSourceLoaded(map)) {
+        console.log('🔍 Vector source already loaded');
+        resolve(true);
+        return;
+      }
+
+      console.log('🔍 Waiting for vector source to load...');
+
+      const checkLoaded = () => {
+        if (isVectorSourceLoaded(map)) {
+          console.log('🔍 Vector source loaded successfully');
+          resolve(true);
+          return;
+        }
+
+        // Continue waiting
+        setTimeout(checkLoaded, 100);
+      };
+
+      // Start checking
+      checkLoaded();
+
+      // Timeout fallback
+      setTimeout(() => {
+        console.log('🔍 Vector source load timeout, proceeding with fallback');
+        resolve(false);
+      }, timeout);
+    });
+  }, [isVectorSourceLoaded]);
+
   // Helper function to get territory geometry and bounds from vector tiles
-  const getTerritoryGeometry = useCallback((territory, map) => {
+  const getTerritoryGeometry = useCallback(async (territory, map) => {
     console.log('🔍 Getting territory geometry for', territory.name, 'with', territory.zips.length, 'ZIPs');
 
     try {
@@ -724,49 +784,165 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       const territoryZips = territory.zips.map(zipObj => zipObj.zip.toString());
       console.log('🔍 Territory ZIPs:', territoryZips);
 
+      // First, try a quick query to see if any features are available
+      const initialFeatures = map.querySourceFeatures(VECTOR_SOURCE_ID, {
+        sourceLayer: VECTOR_SOURCE_LAYER,
+        filter: ['in', ['get', ZIP_PROPERTY], ['literal', territoryZips]]
+      });
+
+      if (initialFeatures.length > 0) {
+        console.log('🔍 Found', initialFeatures.length, 'features immediately');
+        // Process the features we found
+        return processFeatures(initialFeatures, territory);
+      }
+
+      // No features found initially - wait for source to load
+      console.log('🔍 No initial features found, waiting for source to load...');
+      const sourceLoaded = await waitForVectorSource(map, 3000); // Wait up to 3 seconds
+
+      if (!sourceLoaded) {
+        console.log('🔍 Vector source still not loaded after waiting');
+      }
+
+      // Try query again after waiting
       const features = map.querySourceFeatures(VECTOR_SOURCE_ID, {
         sourceLayer: VECTOR_SOURCE_LAYER,
         filter: ['in', ['get', ZIP_PROPERTY], ['literal', territoryZips]]
       });
 
-      console.log('🔍 Found', features.length, 'features for territory', territory.name);
+      console.log('🔍 After waiting, querySourceFeatures returned', features.length, 'features');
 
-      if (features.length === 0) {
-        console.log('🔍 No features found for territory ZIPs, will use fallback geocoding');
-        return null;
+      // Debug: Log some sample features if found
+      if (features.length > 0) {
+        console.log('🔍 Sample feature properties:', features[0].properties);
+        console.log('🔍 Sample feature geometry type:', features[0].geometry?.type);
+        return processFeatures(features, territory);
       }
 
-      // Create GeoJSON FeatureCollection from the features
-      const featureCollection = turf.featureCollection(features);
-      console.log('🔍 Created feature collection with', featureCollection.features.length, 'features');
+      // Still no features - try to fly to an estimated center to load relevant tiles
+      console.log('🔍 Still no features found. Trying to load tiles by flying to estimated center...');
 
-      // Union all polygons to get a single geometry representing the entire territory
-      let unionGeometry;
-      try {
-        unionGeometry = turf.union(featureCollection);
-        console.log('🔍 Successfully unioned territory polygons');
-      } catch (unionError) {
-        console.warn('🔍 Union failed, using first feature as fallback:', unionError);
-        unionGeometry = featureCollection.features[0];
+      // Quick geocoding to get an approximate center
+      const quickCenter = getQuickCenterEstimate(territory);
+      if (quickCenter) {
+        console.log('🔍 Flying to estimated center to load tiles:', quickCenter);
+
+        // Fly to the estimated center to load tiles
+        map.flyTo({
+          center: quickCenter,
+          zoom: 6, // Low zoom to load broader area
+          duration: 500 // Quick movement
+        });
+
+        // Wait a bit for tiles to load
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Try one more query
+        const finalFeatures = map.querySourceFeatures(VECTOR_SOURCE_ID, {
+          sourceLayer: VECTOR_SOURCE_LAYER,
+          filter: ['in', ['get', ZIP_PROPERTY], ['literal', territoryZips]]
+        });
+
+        console.log('🔍 After flying to center, found', finalFeatures.length, 'features');
+
+        if (finalFeatures.length > 0) {
+          return processFeatures(finalFeatures, territory);
+        }
       }
 
-      // Calculate bounding box and centroid
-      const bbox = turf.bbox(unionGeometry);
-      const centroid = turf.centroid(unionGeometry);
+      console.log('🔍 No features found even after trying to load tiles. Possible reasons:');
+      console.log('🔍 - ZIP codes not in tileset');
+      console.log('🔍 - ZIP code format mismatch');
+      console.log('🔍 - Vector tileset configuration issue');
 
-      console.log('🔍 Territory bounds:', bbox);
-      console.log('🔍 Territory centroid:', centroid.geometry.coordinates);
+      // Try a broader query to see if any features are available at all
+      const allFeatures = map.querySourceFeatures(VECTOR_SOURCE_ID, {
+        sourceLayer: VECTOR_SOURCE_LAYER
+      });
+      console.log('🔍 Total features available in loaded tiles:', allFeatures.length);
 
-      return {
-        geometry: unionGeometry,
-        bbox: bbox,
-        centroid: centroid.geometry.coordinates, // [lng, lat]
-        featureCount: features.length
-      };
+      if (allFeatures.length > 0) {
+        console.log('🔍 Sample ZIP codes in loaded tiles:', allFeatures.slice(0, 5).map(f => f.properties?.[ZIP_PROPERTY]));
+      }
+
+      console.log('🔍 Will use fallback geocoding');
+      return null;
+
     } catch (error) {
       console.error('🔍 Error getting territory geometry:', error);
       return null;
     }
+  }, [waitForVectorSource]);
+
+  // Helper function to get a quick center estimate for loading tiles
+  const getQuickCenterEstimate = useCallback((territory) => {
+    if (territory.zips.length === 0) return null;
+
+    // Use the first ZIP code to estimate center
+    const firstZip = territory.zips[0].zip.toString();
+    const prefix = firstZip.substring(0, 3);
+
+    // Use the zipToCoords mapping for a quick estimate
+    const zipToCoords = {
+      '900': [34.05, -118.24], // Los Angeles
+      '902': [34.05, -118.24], // LA area
+      '904': [34.05, -118.24], // LA area
+      '908': [33.83, -118.18], // Long Beach
+      '910': [34.15, -118.12], // Pasadena
+      '911': [34.15, -118.12], // Pasadena
+      '912': [34.24, -118.54], // Glendale
+      '913': [34.24, -118.54], // Glendale
+      '914': [34.24, -118.54], // Glendale
+      '915': [34.24, -118.54], // Glendale
+      '916': [34.15, -118.37], // North Hollywood
+      '917': [34.05, -117.75], // Pomona
+      '918': [34.05, -117.75], // Pomona
+      '919': [32.83, -116.77], // Chula Vista
+      '920': [33.22, -117.34], // Escondido
+      '921': [32.72, -117.16], // San Diego
+      '922': [33.72, -116.22], // Palm Desert
+      '923': [34.89, -116.95], // Victorville
+      '924': [34.11, -117.30], // San Bernardino
+      '925': [33.94, -117.40], // Riverside
+      '926': [33.67, -117.82], // Newport Beach
+      '927': [33.75, -117.87], // Orange
+      '928': [33.83, -117.91], // Anaheim
+    };
+
+    return zipToCoords[prefix] || estimateCoordsFromZip(prefix);
+  }, []);
+
+  // Helper function to process found features
+  const processFeatures = useCallback((features, territory) => {
+    console.log('🔍 Processing', features.length, 'features for territory', territory.name);
+
+    // Create GeoJSON FeatureCollection from the features
+    const featureCollection = turf.featureCollection(features);
+    console.log('🔍 Created feature collection with', featureCollection.features.length, 'features');
+
+    // Union all polygons to get a single geometry representing the entire territory
+    let unionGeometry;
+    try {
+      unionGeometry = turf.union(featureCollection);
+      console.log('🔍 Successfully unioned territory polygons');
+    } catch (unionError) {
+      console.warn('🔍 Union failed, using first feature as fallback:', unionError);
+      unionGeometry = featureCollection.features[0];
+    }
+
+    // Calculate bounding box and centroid
+    const bbox = turf.bbox(unionGeometry);
+    const centroid = turf.centroid(unionGeometry);
+
+    console.log('🔍 Territory bounds:', bbox);
+    console.log('🔍 Territory centroid:', centroid.geometry.coordinates);
+
+    return {
+      geometry: unionGeometry,
+      bbox: bbox,
+      centroid: centroid.geometry.coordinates, // [lng, lat]
+      featureCount: features.length
+    };
   }, []);
 
   // Handle window resize to ensure map resizes properly
@@ -810,22 +986,23 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
   // Handle selected territory tooltip (persistent)
   useEffect(() => {
-    console.log('🔍 Selected territory tooltip useEffect triggered - activeTerritoryId:', activeTerritoryId, 'mapLoaded:', mapLoaded, 'addMode:', !!localAddModeTerritoryIdRef.current);
-    console.log('🔍 Available territories:', territories.map(t => `${t.name} (id: ${t.id})`));
-    console.log('🔍 mapRef.current exists:', !!mapRef.current);
+    const setupTooltip = async () => {
+      console.log('🔍 Selected territory tooltip useEffect triggered - activeTerritoryId:', activeTerritoryId, 'mapLoaded:', mapLoaded, 'addMode:', !!localAddModeTerritoryIdRef.current);
+      console.log('🔍 Available territories:', territories.map(t => `${t.name} (id: ${t.id})`));
+      console.log('🔍 mapRef.current exists:', !!mapRef.current);
 
-    // Don't show territory tooltip in add mode - only show individual ZIP tooltips
-    if (localAddModeTerritoryIdRef.current) {
-      console.log('🔍 Skipping territory tooltip - in add mode');
-      return;
-    }
+      // Don't show territory tooltip in add mode - only show individual ZIP tooltips
+      if (localAddModeTerritoryIdRef.current) {
+        console.log('🔍 Skipping territory tooltip - in add mode');
+        return;
+      }
 
-    if (!mapLoaded || !mapRef.current) {
-      console.log('🔍 Early return from tooltip useEffect - conditions not met');
-      return;
-    }
+      if (!mapLoaded || !mapRef.current) {
+        console.log('🔍 Early return from tooltip useEffect - conditions not met');
+        return;
+      }
 
-    const map = mapRef.current.getMap();
+      const map = mapRef.current.getMap();
 
     // Remove existing selected territory popup
     if (selectedTerritoryPopup) {
@@ -876,7 +1053,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       let centerLat, centerLng;
 
       // Try to get actual geometry from vector tiles first
-      const territoryGeometry = getTerritoryGeometry(territory, map);
+      const territoryGeometry = await getTerritoryGeometry(territory, map);
 
       if (territoryGeometry && territoryGeometry.centroid) {
         // Use the actual centroid from the unioned territory geometry
@@ -1112,8 +1289,11 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         console.error('❌ mapboxgl available:', typeof mapboxgl);
         console.error('❌ mapboxgl.Popup available:', typeof mapboxgl?.Popup);
       }
-    }
-  }, [activeTerritoryId, territories, mapLoaded]);
+    };
+
+    // Call the async function
+    setupTooltip();
+  }, [activeTerritoryId, territories, mapLoaded, getTerritoryGeometry]);
 
 
   // Fallback: Force map to be considered loaded after 10 seconds
@@ -1350,7 +1530,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
   }, [popupInfo]);
 
   // Zoom to territory implementation
-  const zoomToTerritory = useCallback((territoryId) => {
+  const zoomToTerritory = useCallback(async (territoryId) => {
     console.log('🎯 zoomToTerritory called for', territoryId);
 
     const territory = territories.find(t => String(t.id) === String(territoryId));
@@ -1373,7 +1553,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     const map = mapRef.current.getMap();
 
     // First try to get actual geometry from vector tiles
-    const territoryGeometry = getTerritoryGeometry(territory, map);
+    const territoryGeometry = await getTerritoryGeometry(territory, map);
 
     if (territoryGeometry) {
       console.log('🎯 Using actual territory geometry for zoom');
@@ -2079,33 +2259,72 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       return;
     }
 
-    // Calculate centroid of all found coordinates
-    const avgLat = coordinates.reduce((sum, coord) => sum + coord[0], 0) / coordinates.length;
-    const avgLng = coordinates.reduce((sum, coord) => sum + coord[1], 0) / coordinates.length;
+    // Calculate a more intelligent center - use median instead of mean to avoid outliers
+    const sortedLats = coordinates.map(c => c[0]).sort((a, b) => a - b);
+    const sortedLngs = coordinates.map(c => c[1]).sort((a, b) => a - b);
 
-    console.log(`Territory center calculated: [${avgLat}, ${avgLng}] from ${foundZips}/${territory.zips.length} ZIPs`);
-    console.log(`All coordinates used:`, coordinates);
-    console.log(`ZIP codes processed:`, territory.zips.map(z => {
-      const prefix = z.zip.substring(0,3);
-      const mappedCoords = zipToCoords[prefix];
-      if (mappedCoords) {
-        return `${z.zip} -> specific [${mappedCoords[0]}, ${mappedCoords[1]}]`;
-      } else {
-        const estimated = estimateCoordsFromZip(prefix);
-        return `${z.zip} -> estimated [${estimated[0]}, ${estimated[1]}]`;
+    const midIndex = Math.floor(coordinates.length / 2);
+    let centerLat = sortedLats[midIndex]; // Use median latitude
+    let centerLng = sortedLngs[midIndex]; // Use median longitude
+
+    // If we have many coordinates spread out, try to find a more central location
+    if (coordinates.length > 3) {
+      // Calculate the range
+      const latRange = sortedLats[sortedLats.length - 1] - sortedLats[0];
+      const lngRange = sortedLngs[sortedLngs.length - 1] - sortedLngs[0];
+
+      console.log(`Coordinate spread - Lat range: ${latRange.toFixed(2)}°, Lng range: ${lngRange.toFixed(2)}°`);
+
+      // If coordinates are very spread out, use a different approach
+      if (latRange > 5 || lngRange > 5) {
+        console.log('Coordinates are widely spread, using center of bounding box instead of median');
+
+        // Use center of bounding box for widely spread territories
+        const minLat = Math.min(...coordinates.map(c => c[0]));
+        const maxLat = Math.max(...coordinates.map(c => c[0]));
+        const minLng = Math.min(...coordinates.map(c => c[1]));
+        const maxLng = Math.max(...coordinates.map(c => c[1]));
+
+        centerLat = (minLat + maxLat) / 2;
+        centerLng = (minLng + maxLng) / 2;
+
+        console.log(`Using bounding box center: [${centerLat}, ${centerLng}]`);
       }
-    }));
+    }
+
+    console.log(`Territory center calculated: [${centerLat}, ${centerLng}] from ${foundZips}/${territory.zips.length} ZIPs`);
+    console.log(`All coordinates used:`, coordinates.slice(0, 10)); // Log first 10 to avoid spam
+    if (coordinates.length > 10) {
+      console.log(`... and ${coordinates.length - 10} more coordinates`);
+    }
+
+    // Determine appropriate zoom level based on coordinate spread
+    let zoomLevel = 8;
+    if (coordinates.length > 0) {
+      const latRange = sortedLats[sortedLats.length - 1] - sortedLats[0];
+      const lngRange = sortedLngs[sortedLngs.length - 1] - sortedLngs[0];
+      const maxRange = Math.max(latRange, lngRange);
+
+      // Adjust zoom based on spread
+      if (maxRange < 0.5) zoomLevel = 10;      // Very tight cluster
+      else if (maxRange < 1) zoomLevel = 9;    // Moderately tight
+      else if (maxRange < 3) zoomLevel = 8;    // Normal spread
+      else if (maxRange < 5) zoomLevel = 7;    // Wide spread
+      else zoomLevel = 6;                      // Very wide spread
+
+      console.log(`Auto-adjusted zoom level to ${zoomLevel} based on coordinate spread of ${maxRange.toFixed(2)}°`);
+    }
 
     // Zoom to the calculated center
     map.flyTo({
-      center: [avgLng, avgLat], // Note: Mapbox uses [lng, lat]
-      zoom: 8,
+      center: [centerLng, centerLat], // Note: Mapbox uses [lng, lat]
+      zoom: zoomLevel,
       duration: 1500
     });
 
-    console.log(`Flying to center: [${avgLng}, ${avgLat}]`);
+    console.log(`Flying to center: [${centerLng}, ${centerLat}] at zoom ${zoomLevel}`);
 
-    console.log('Zoomed to territory center using geocoding fallback');
+    console.log('Zoomed to territory center using improved geocoding fallback');
   }, [mapRef]);
 
   // Utility functions for mode control
