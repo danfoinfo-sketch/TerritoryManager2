@@ -1212,9 +1212,10 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         setPopupInfo({
           zip: zipCode,
           lngLat: e.lngLat,
-          population,
-          standAloneHouses,
+          population: cachedData?.population || 0,
+          standAloneHouses: cachedData?.standAloneHouses || 0,
           estimated: isEstimated,
+          loading: !cachedData, // Show loading if no cached data
         });
       }
 
