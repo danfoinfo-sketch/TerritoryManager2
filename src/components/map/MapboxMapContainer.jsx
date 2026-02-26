@@ -948,11 +948,13 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       console.log('🔍 POPUP CONTENT PREP - Territory:', territory.name, 'Population:', stats.population, 'Homes:', stats.homes, 'ZIPs:', stats.zipCount);
 
       const popupHtml = `
-        <div style="font-weight: bold; margin-bottom: 4px;">${territory.name}</div>
-        <div>Population: ${stats.population.toLocaleString()}</div>
-        <div>Homes: ${stats.homes.toLocaleString()}</div>
+        <div style="font-weight: bold; margin-bottom: 4px; color: #000;">${territory.name}</div>
+        <div style="color: #000; font-weight: normal;">Population: ${stats.population.toLocaleString()}</div>
+        <div style="color: #000; font-weight: normal;">Homes: ${stats.homes.toLocaleString()}</div>
         <div style="font-size: 0.9em; color: #666;">${stats.zipCount} ZIPs</div>
       `;
+
+      console.log('🔍 FINAL POPUP HTML:', popupHtml);
       console.log('🔍 Generated popup HTML:', popupHtml);
 
       try {
