@@ -1072,8 +1072,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     // Fetch census data asynchronously (non-blocking)
     fetchZipPopulationAndHouses(zipCode).then(censusData => {
       console.log('🖱️ Got real census data asynchronously:', zipCode, censusData);
-      // Update the ZIP with real data once it arrives
-      addZipToActiveTerritory(zipCode, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current);
+      // Update the ZIP with real data once it arrives (don't toggle, just update existing)
+      addZipToActiveTerritory(zipCode, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current, true);
 
       // Update tooltip with real data
       setPopupInfo(currentPopup => {
