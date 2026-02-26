@@ -815,6 +815,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       }
 
       console.log('🔍 Territory has', territory.zips.length, 'ZIPs');
+      console.log('🔍 Territory ZIPs data:', territory.zips.map(z => ({ zip: z.zip, pop: z.pop, houses: z.standAloneHouses })));
       const stats = calculateTerritoryStats(territory);
       console.log('🔍 Calculated stats:', stats);
 
@@ -947,6 +948,14 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       }
       console.log('🔍 POPUP CONTENT PREP - Territory:', territory.name, 'Population:', stats.population, 'Homes:', stats.homes, 'ZIPs:', stats.zipCount);
 
+      const popupHtml = `
+        <div style="font-weight: bold; margin-bottom: 4px;">${territory.name}</div>
+        <div>Population: ${stats.population.toLocaleString()}</div>
+        <div>Homes: ${stats.homes.toLocaleString()}</div>
+        <div style="font-size: 0.9em; color: #666;">${stats.zipCount} ZIPs</div>
+      `;
+      console.log('🔍 Generated popup HTML:', popupHtml);
+
       try {
         console.log('🔍 Attempting to create popup...');
         const popup = new mapboxgl.Popup({
@@ -957,12 +966,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           // Note: draggable option removed - implementing custom drag functionality
         })
           .setLngLat([centerLng, centerLat])
-          .setHTML(`
-            <div style="font-weight: bold; margin-bottom: 4px;">${territory.name}</div>
-            <div>Population: ${stats.population.toLocaleString()}</div>
-            <div>Homes: ${stats.homes.toLocaleString()}</div>
-            <div style="font-size: 0.9em; color: #666;">${stats.zipCount} ZIPs</div>
-          `)
+          .setHTML(popupHtml)
+          .addTo(map);
           .addTo(map);
 
         // Implement custom drag functionality
