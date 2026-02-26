@@ -1085,7 +1085,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         lngLat: e.lngLat,
         population: 0, // Placeholder initially
         standAloneHouses: 0,
-        estimated: true // Will be updated when real data arrives
+        estimated: true, // Will be updated when real data arrives
       });
     }
 
@@ -1173,7 +1173,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           lngLat: e.lngLat,
           population,
           standAloneHouses,
-          estimated: isEstimated
+          estimated: isEstimated,
         });
       }
 
