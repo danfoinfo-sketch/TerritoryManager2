@@ -2,7 +2,7 @@
 const CENSUS_API_KEY = import.meta.env.VITE_CENSUS_API_KEY || '0a85b2c9a4ae36ec7479013358c9002da2149c34'; // Fallback to hardcoded key
 
 // Cache for API results to avoid duplicate calls
-const apiCache = new Map();
+export const apiCache = new Map();
 
 export const fetchCountyPopulation = async (stateFips, countyFips) => {
   try {

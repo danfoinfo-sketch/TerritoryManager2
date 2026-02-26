@@ -17,7 +17,7 @@ import Map, { Source, Layer, NavigationControl } from 'react-map-gl';
 import mapboxgl from 'mapbox-gl';
 import { Loader2 } from "lucide-react";
 import * as turf from "@turf/turf";
-import { fetchZipPopulationAndHouses } from "./censusApi";
+import { fetchZipPopulationAndHouses, apiCache } from "./censusApi";
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || 'your-mapbox-token-here';
@@ -1117,6 +1117,17 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       console.log('🖱️ Calling addZipToActiveTerritory with:', zipCode, population, standAloneHouses, 'territoryId:', localAddModeTerritoryIdRef.current);
       addZipToActiveTerritory(zipCode, population, standAloneHouses, localAddModeTerritoryIdRef.current);
 
+      // Show tooltip for successful data retrieval
+      const cachedData = apiCache.get(zipCode);
+      const isEstimated = cachedData?.estimated || false;
+      setPopupInfo({
+        zip: zipCode,
+        lngLat: e.lngLat,
+        population,
+        standAloneHouses,
+        estimated: isEstimated
+      });
+
       // Handle highlighting based on mode
       if (!localAddModeTerritoryIdRef.current) {
         // Not in add mode - highlight just this ZIP
@@ -1190,17 +1201,6 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
             map.triggerRepaint();
           }
         }
-
-        // Show tooltip
-        const cachedData = apiCache.get(zipCode);
-        const isEstimated = cachedData?.estimated || false;
-        setPopupInfo({
-          zip: zipCode,
-          lngLat: e.lngLat,
-          population,
-          standAloneHouses,
-          estimated: isEstimated
-        });
       } else {
         // In add mode - the territories useEffect will handle highlighting when territories update
         console.log('🖱️ In add mode - territories useEffect will handle highlighting');
