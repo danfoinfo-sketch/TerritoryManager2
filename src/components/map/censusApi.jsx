@@ -45,36 +45,11 @@ export const fetchZipPopulationAndHouses = async (zip) => {
 
   try {
     console.log(`Fetching census data for ZIP: ${zip}`);
-    // Try multiple Census API endpoints for better coverage
-    let response;
-    let apiSuccess = false;
+    const response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
 
-    // Try ZCTA first (most specific)
-    try {
-      response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=${CENSUS_API_KEY}`);
-      if (response.ok) {
-        apiSuccess = true;
-      }
-    } catch (e) {
-      console.log(`ZCTA failed for ${zip}, trying alternatives...`);
-    }
-
-    // If ZCTA fails, try ZIP Code Tabulation Area
-    if (!apiSuccess) {
-      try {
-        response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zip%20code%20tabulation%20area:${zip}&key=${CENSUS_API_KEY}`);
-        if (response.ok) {
-          apiSuccess = true;
-        }
-      } catch (e) {
-        console.log(`ZIP Code Tabulation Area failed for ${zip}`);
-      }
-    }
-
-    // If both fail, try to get county-level data for the ZIP's area
-    if (!apiSuccess) {
-      console.log(`No direct ZIP data available for ${zip}, census data may not exist for this area`);
-      throw new Error(`ZIP code ${zip} not found in Census database`);
+    if (!response.ok) {
+      console.warn(`API returned ${response.status} for ZIP ${zip}`);
+      throw new Error(`API returned ${response.status}`);
     }
 
     const data = await response.json();
@@ -96,14 +71,6 @@ export const fetchZipPopulationAndHouses = async (zip) => {
 
   } catch (error) {
     console.error(`Census API failed for ZIP ${zip}:`, error.message);
-
-    // Provide more helpful error messages
-    if (error.message.includes('ZIP code') && error.message.includes('not found')) {
-      throw new Error(`ZIP code ${zip} is not in the Census database. This often happens for rural or newly created ZIP codes.`);
-    } else if (error.message.includes('400')) {
-      throw new Error(`ZIP code ${zip} data not available. The Census Bureau doesn't maintain data for all ZIP codes.`);
-    } else {
-      throw new Error(`Failed to fetch census data for ZIP ${zip}: ${error.message}`);
-    }
+    throw new Error(`Failed to fetch census data for ZIP ${zip}: ${error.message}`);
   }
 };
