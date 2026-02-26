@@ -2227,8 +2227,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
                 Detached Homes: {popupInfo.standAloneHouses?.toLocaleString()}
               </div>
             </div>
-            );
-          })()}
+          )}
         </div>
       )}
 
