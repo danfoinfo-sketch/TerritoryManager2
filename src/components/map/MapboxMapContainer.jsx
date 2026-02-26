@@ -1395,8 +1395,26 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       console.log(`Tennessee region: ${prefix} -> [36.2, -86.8]`);
       return [36.2, -86.8]; // Nashville area
     }
-    // 4xxx: Great Lakes
-    if (prefix >= 400 && prefix <= 499) {
+    // 4xxx: Great Lakes - Indiana specific first
+    if (prefix >= 460 && prefix <= 462) {
+      console.log(`Central Indiana region: ${prefix} -> [40.1, -85.7]`);
+      return [40.1, -85.7]; // Anderson/Frankfort area
+    }
+    if (prefix >= 463 && prefix <= 479) {
+      console.log(`Central Indiana region: ${prefix} -> [40.1, -85.7]`);
+      return [40.1, -85.7]; // Other central Indiana
+    }
+    if (prefix >= 473 && prefix <= 473) {
+      console.log(`Eastern Indiana region: ${prefix} -> [40.2, -85.4]`);
+      return [40.2, -85.4]; // Muncie/Richmond area
+    }
+    // 4xxx: Great Lakes (Michigan, Ohio, Illinois, Wisconsin, Minnesota)
+    if (prefix >= 480 && prefix <= 499) {
+      console.log(`Great Lakes region: ${prefix} -> [42.0, -87.0]`);
+      return [42.0, -87.0];
+    }
+    // 4xxx: Other Great Lakes states
+    if (prefix >= 400 && prefix <= 459) {
       console.log(`Great Lakes region: ${prefix} -> [42.0, -87.0]`);
       return [42.0, -87.0];
     }
