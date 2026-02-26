@@ -196,13 +196,30 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     const map = mapRef.current.getMap();
     console.log('🗺️ Map instance obtained:', !!map);
 
-    // Force resize to ensure proper dimensions
+    // Force multiple resize calls to ensure proper dimensions
+    console.log('🗺️ Forcing immediate map resize');
+    map.resize();
+    console.log('Map resized immediately');
+
+    // Additional resize calls with delays to handle async rendering
     setTimeout(() => {
-      console.log('🗺️ Forcing map resize');
+      console.log('🗺️ Forcing map resize (100ms delay)');
+      map.resize();
+      console.log('Map resized at 100ms');
+    }, 100);
+
+    setTimeout(() => {
+      console.log('🗺️ Forcing map resize (500ms delay)');
+      map.resize();
+      console.log('Map resized at 500ms');
+    }, 500);
+
+    setTimeout(() => {
+      console.log('🗺️ Forcing map resize (1000ms delay)');
       map.resize();
       map.triggerRepaint();
-      console.log('🗺️ Map resized and repainted');
-    }, 100);
+      console.log('Map resized and repainted at 1000ms');
+    }, 1000);
 
     // Function to hide default Mapbox boundary layers (but keep state boundaries)
     const hideDefaultBoundaries = () => {
@@ -1072,6 +1089,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       if (mapRef.current && mapRef.current.getMap) {
         const map = mapRef.current.getMap();
         if (map) {
+          console.log('Map resized due to window resize event');
           map.resize();
         }
       }
@@ -1081,28 +1099,73 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Force map repaint when it loads
+  // Force resize when territories change (might affect layout)
+  useEffect(() => {
+    if (mapLoaded && mapRef.current) {
+      setTimeout(() => {
+        const map = mapRef.current.getMap();
+        if (map) {
+          console.log('🗺️ Territories changed, forcing map resize');
+          map.resize();
+        }
+      }, 100);
+    }
+  }, [territories, mapLoaded]);
+
+  // Force map repaint and resize when it loads
   useEffect(() => {
     if (mapLoaded && mapRef.current) {
       console.log('🗺️ Map loaded, forcing repaints and resizes');
       const map = mapRef.current.getMap();
       if (map) {
-        // Multiple resize and repaint calls to ensure it works
+        // Immediate resize
+        console.log('Map resized immediately on load');
         map.resize();
         map.triggerRepaint();
 
+        // Additional resize calls with increasing delays
         setTimeout(() => {
+          console.log('Map resized at 200ms after load');
+          map.resize();
+        }, 200);
+
+        setTimeout(() => {
+          console.log('Map resized at 500ms after load');
           map.resize();
           map.triggerRepaint();
         }, 500);
 
         setTimeout(() => {
+          console.log('Map resized at 1000ms after load');
           map.resize();
           map.triggerRepaint();
         }, 1000);
+
+        setTimeout(() => {
+          console.log('Map resized at 2000ms after load');
+          map.resize();
+        }, 2000);
       }
     }
   }, [mapLoaded]);
+
+  // Force resize on component mount to handle initial sizing issues
+  useEffect(() => {
+    const forceInitialResize = () => {
+      if (mapRef.current) {
+        const map = mapRef.current.getMap();
+        if (map) {
+          console.log('Map resized on component mount');
+          map.resize();
+        }
+      }
+    };
+
+    // Try multiple times in case map isn't ready yet
+    setTimeout(forceInitialResize, 100);
+    setTimeout(forceInitialResize, 500);
+    setTimeout(forceInitialResize, 1000);
+  }, []);
 
   // Handle selected territory tooltip (persistent)
   useEffect(() => {
@@ -2526,6 +2589,18 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         onLoad={() => {
           console.log('🗺️ Map onLoad callback fired');
           setMapLoaded(true);
+
+          // Force immediate resize when map loads
+          setTimeout(() => {
+            if (mapRef.current) {
+              const map = mapRef.current.getMap();
+              if (map) {
+                console.log('Map resized immediately in onLoad callback');
+                map.resize();
+              }
+            }
+          }, 0);
+
           onMapLoad();
         }}
         onError={(e) => {
