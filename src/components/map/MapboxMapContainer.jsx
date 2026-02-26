@@ -1074,6 +1074,17 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       console.log('🖱️ Got real census data asynchronously:', zipCode, censusData);
       // Update the ZIP with real data once it arrives
       addZipToActiveTerritory(zipCode, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current);
+
+      // Update tooltip if it's currently showing this ZIP
+      if (popupInfo && popupInfo.zip === zipCode && popupInfo.estimated) {
+        console.log('🖱️ Updating tooltip with real census data:', censusData);
+        setPopupInfo({
+          ...popupInfo,
+          population: censusData.population,
+          standAloneHouses: censusData.standAloneHouses,
+          estimated: false
+        });
+      }
     }).catch(censusError => {
       console.warn('🖱️ Census API failed asynchronously:', zipCode, censusError.message);
       // Keep placeholder data (0, 0) - already set above
@@ -1105,14 +1116,21 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
         // Show tooltip for the selected ZIP
         const cachedData = apiCache.get(zipCode);
-        const isEstimated = cachedData?.estimated || false;
-        console.log('🖱️ Setting popup info for single ZIP:', { zip: zipCode, cachedData: !!cachedData, estimated: isEstimated, population: cachedData?.population });
+        const hasRealData = cachedData && !cachedData.estimated;
+        console.log('🖱️ Setting popup info for single ZIP:', {
+          zip: zipCode,
+          hasCachedData: !!cachedData,
+          hasRealData,
+          population: cachedData?.population,
+          estimated: cachedData?.estimated
+        });
+
         setPopupInfo({
           zip: zipCode,
           lngLat: e.lngLat,
-          population: cachedData?.population || 0,
-          standAloneHouses: cachedData?.standAloneHouses || 0,
-          estimated: isEstimated
+          population: hasRealData ? cachedData.population : 0,
+          standAloneHouses: hasRealData ? cachedData.standAloneHouses : 0,
+          estimated: !hasRealData // Show as estimated if we don't have real data yet
         });
 
         // Update the highlight layer filter immediately (type-safe)
