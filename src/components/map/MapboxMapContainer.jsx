@@ -1099,7 +1099,19 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
     try {
       console.log('🖱️ Fetching/caching data for ZIP:', zipCode);
-        const { population, standAloneHouses } = await fetchZipPopulationAndHouses(zipCode);
+      let population, standAloneHouses;
+
+      try {
+        const censusData = await fetchZipPopulationAndHouses(zipCode);
+        population = censusData.population;
+        standAloneHouses = censusData.standAloneHouses;
+        console.log('🖱️ Got real census data:', { population, standAloneHouses });
+      } catch (censusError) {
+        console.warn('🖱️ Census API failed, using placeholder values:', censusError.message);
+        // Use placeholder values when census data is unavailable
+        population = 0;
+        standAloneHouses = 0;
+      }
 
       // Always try to add ZIP to territory (let App.jsx decide if it's allowed)
       console.log('🖱️ Calling addZipToActiveTerritory with:', zipCode, population, standAloneHouses, 'territoryId:', localAddModeTerritoryIdRef.current);
@@ -1184,7 +1196,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           zip: zipCode,
           lngLat: e.lngLat,
           population,
-          standAloneHouses
+          standAloneHouses,
+          error: population === 0 && standAloneHouses === 0 // Flag when using placeholder data
         });
       } else {
         // In add mode - the territories useEffect will handle highlighting when territories update
