@@ -23,5 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 # Large data files (not needed for current Mapbox implementation)
 public/data/us-zips.geojson
