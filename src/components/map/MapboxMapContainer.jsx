@@ -1075,28 +1075,34 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       // Update the ZIP with real data once it arrives
       addZipToActiveTerritory(zipCode, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current);
 
-      // Update tooltip if it's currently showing this ZIP
-      if (popupInfo && popupInfo.zip === zipCode) {
-        console.log('🖱️ Updating tooltip with real census data:', censusData);
-        setPopupInfo({
-          ...popupInfo,
-          population: censusData.population,
-          standAloneHouses: censusData.standAloneHouses,
-          estimated: false
-        });
-      }
+      // Always try to update tooltip (popupInfo might change during async operation)
+      setPopupInfo(currentPopup => {
+        if (currentPopup && currentPopup.zip === zipCode) {
+          console.log('🖱️ Updating tooltip with real census data:', censusData);
+          return {
+            ...currentPopup,
+            population: censusData.population,
+            standAloneHouses: censusData.standAloneHouses,
+            estimated: false
+          };
+        }
+        return currentPopup; // Return unchanged if not matching
+      });
     }).catch(censusError => {
       console.warn('🖱️ Census API failed asynchronously:', zipCode, censusError.message);
-      // Update tooltip to show data unavailable if it's currently showing this ZIP
-      if (popupInfo && popupInfo.zip === zipCode) {
-        console.log('🖱️ Updating tooltip to show data unavailable');
-        setPopupInfo({
-          ...popupInfo,
-          population: 0,
-          standAloneHouses: 0,
-          estimated: true
-        });
-      }
+      // Update tooltip to show data unavailable
+      setPopupInfo(currentPopup => {
+        if (currentPopup && currentPopup.zip === zipCode) {
+          console.log('🖱️ Updating tooltip to show data unavailable');
+          return {
+            ...currentPopup,
+            population: 0,
+            standAloneHouses: 0,
+            estimated: true
+          };
+        }
+        return currentPopup; // Return unchanged if not matching
+      });
     });
 
     // Show tooltip in add mode (immediate feedback)
