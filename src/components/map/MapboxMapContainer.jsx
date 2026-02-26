@@ -940,10 +940,62 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         centerLat = mapCenter.lat;
         console.log('🔍 No ZIP coordinates found, using map center for tooltip');
       } else {
-        // Calculate centroid of all found coordinates
-        centerLat = coordinates.reduce((sum, coord) => sum + coord[0], 0) / coordinates.length;
-        centerLng = coordinates.reduce((sum, coord) => sum + coord[1], 0) / coordinates.length;
-        console.log('🔍 Positioning tooltip at territory center:', [centerLng, centerLat], 'from', foundZips, 'ZIP coordinates');
+        // Try to get the actual bounds of selected ZIP polygons on the map
+        try {
+          const source = map.getSource('zips');
+          if (source && source._data && source._data.features) {
+            // Filter features to only those in the territory
+            const territoryFeatures = source._data.features.filter(feature =>
+              selectedZips.includes(feature.properties.ZCTA5CE20 || feature.properties.ZIP_CODE)
+            );
+
+            if (territoryFeatures.length > 0) {
+              // Calculate bounds from actual polygon geometry
+              let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+
+              territoryFeatures.forEach(feature => {
+                if (feature.geometry && feature.geometry.coordinates) {
+                  // Handle both Polygon and MultiPolygon geometries
+                  const coords = feature.geometry.type === 'Polygon'
+                    ? [feature.geometry.coordinates]
+                    : feature.geometry.coordinates;
+
+                  coords.forEach(polygon => {
+                    polygon.forEach(ring => {
+                      ring.forEach(coord => {
+                        minLng = Math.min(minLng, coord[0]);
+                        maxLng = Math.max(maxLng, coord[0]);
+                        minLat = Math.min(minLat, coord[1]);
+                        maxLat = Math.max(maxLat, coord[1]);
+                      });
+                    });
+                  });
+                }
+              });
+
+              // Use center of actual polygon bounds
+              centerLng = (minLng + maxLng) / 2;
+              centerLat = (minLat + maxLat) / 2;
+              console.log('🔍 Positioning tooltip at actual territory polygon center:', [centerLng, centerLat], 'from', territoryFeatures.length, 'features');
+            } else {
+              // Fall back to geocoded coordinate centroid
+              centerLat = coordinates.reduce((sum, coord) => sum + coord[0], 0) / coordinates.length;
+              centerLng = coordinates.reduce((sum, coord) => sum + coord[1], 0) / coordinates.length;
+              console.log('🔍 No polygon features found, using geocoded center:', [centerLng, centerLat], 'from', foundZips, 'ZIP coordinates');
+            }
+          } else {
+            // Fall back to geocoded coordinate centroid
+            centerLat = coordinates.reduce((sum, coord) => sum + coord[0], 0) / coordinates.length;
+            centerLng = coordinates.reduce((sum, coord) => sum + coord[1], 0) / coordinates.length;
+            console.log('🔍 No source data available, using geocoded center:', [centerLng, centerLat], 'from', foundZips, 'ZIP coordinates');
+          }
+        } catch (error) {
+          console.warn('🔍 Error calculating polygon bounds, falling back to geocoded center:', error);
+          // Fall back to geocoded coordinate centroid
+          centerLat = coordinates.reduce((sum, coord) => sum + coord[0], 0) / coordinates.length;
+          centerLng = coordinates.reduce((sum, coord) => sum + coord[1], 0) / coordinates.length;
+          console.log('🔍 Using geocoded center as fallback:', [centerLng, centerLat], 'from', foundZips, 'ZIP coordinates');
+        }
       }
       console.log('🔍 POPUP CONTENT PREP - Territory:', territory.name, 'Population:', stats.population, 'Homes:', stats.homes, 'ZIPs:', stats.zipCount);
 
