@@ -1075,7 +1075,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       // Update the ZIP with real data once it arrives
       addZipToActiveTerritory(zipCode, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current);
 
-      // Always try to update tooltip (popupInfo might change during async operation)
+      // Update tooltip with real data
       setPopupInfo(currentPopup => {
         if (currentPopup && currentPopup.zip === zipCode) {
           console.log('🖱️ Updating tooltip with real census data:', censusData);
@@ -1083,7 +1083,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
             ...currentPopup,
             population: censusData.population,
             standAloneHouses: censusData.standAloneHouses,
-            estimated: false
+            estimated: false,
+            loading: false
           };
         }
         return currentPopup; // Return unchanged if not matching
@@ -1098,7 +1099,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
             ...currentPopup,
             population: 0,
             standAloneHouses: 0,
-            estimated: true
+            estimated: true,
+            loading: false
           };
         }
         return currentPopup; // Return unchanged if not matching
@@ -1129,14 +1131,15 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         }
         setSelectedZips([zipCode]);
 
-        // Show tooltip for the selected ZIP (will be updated when real data arrives)
-        console.log('🖱️ Setting initial tooltip for ZIP:', zipCode);
+        // Show tooltip for the selected ZIP (loading state until real data arrives)
+        console.log('🖱️ Setting loading tooltip for ZIP:', zipCode);
         setPopupInfo({
           zip: zipCode,
           lngLat: e.lngLat,
-          population: 0, // Placeholder until real data arrives
+          population: 0,
           standAloneHouses: 0,
-          estimated: true // Initially estimated until real data arrives
+          estimated: true,
+          loading: true // Loading state
         });
 
         // Update the highlight layer filter immediately (type-safe)
@@ -2186,7 +2189,10 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           }}
         >
           {popupInfo.loading ? (
-            <div>Loading ZIP data...</div>
+            <div>
+              <strong>ZIP: {popupInfo.zip}</strong><br/>
+              <small>Loading census data...</small>
+            </div>
           ) : popupInfo.estimated ? (
             <div>
               <strong>ZIP: {popupInfo.zip}</strong><br/>
