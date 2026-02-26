@@ -986,7 +986,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
   // Handle selected territory tooltip (persistent)
   useEffect(() => {
-    const setupTooltip = async () => {
+    (async () => {
       console.log('🔍 Selected territory tooltip useEffect triggered - activeTerritoryId:', activeTerritoryId, 'mapLoaded:', mapLoaded, 'addMode:', !!localAddModeTerritoryIdRef.current);
       console.log('🔍 Available territories:', territories.map(t => `${t.name} (id: ${t.id})`));
       console.log('🔍 mapRef.current exists:', !!mapRef.current);
@@ -1289,10 +1289,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         console.error('❌ mapboxgl available:', typeof mapboxgl);
         console.error('❌ mapboxgl.Popup available:', typeof mapboxgl?.Popup);
       }
-    };
-
-    // Call the async function
-    setupTooltip();
+    })();
   }, [activeTerritoryId, territories, mapLoaded]);
 
 
