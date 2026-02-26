@@ -775,6 +775,38 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     });
   }, [isVectorSourceLoaded]);
 
+  // Helper function to geocode a single location (returns coordinates without zooming)
+  const geocodeLocation = useCallback(async (query) => {
+    if (!query || !query.trim()) {
+      return null;
+    }
+
+    const trimmedQuery = query.trim();
+
+    try {
+      const encodedQuery = encodeURIComponent(trimmedQuery);
+      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=us&types=postcode,place,region&limit=1`;
+
+      const response = await fetch(geocodingUrl);
+      const data = await response.json();
+
+      if (!data.features || data.features.length === 0) {
+        return null;
+      }
+
+      const selectedFeature = data.features[0];
+      return {
+        center: selectedFeature.center, // [lng, lat]
+        bbox: selectedFeature.bbox,
+        placeName: selectedFeature.place_name
+      };
+
+    } catch (error) {
+      console.error('Error geocoding location:', error);
+      return null;
+    }
+  }, []);
+
   // Helper function to geocode a location and zoom to it using Mapbox Geocoding API
   const geocodeAndZoom = useCallback(async (query) => {
     if (!query || !query.trim()) {
@@ -1515,11 +1547,62 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
     const map = mapRef.current.getMap();
 
-    // Use the first ZIP code from the territory for geocoding
-    const firstZip = territory.zips[0].zip;
-    console.log('🎯 Using first ZIP for geocoding:', firstZip);
+    // For territories with multiple ZIPs, geocode all of them and fit bounds
+    if (territory.zips.length > 1) {
+      console.log('🎯 Territory has multiple ZIPs, calculating bounds for all');
 
-    // Use geocoding API to zoom to the territory location
+      // Geocode all ZIP codes to get their locations
+      const geocodePromises = territory.zips.map(zipObj => {
+        return new Promise(async (resolve) => {
+          try {
+            const result = await geocodeLocation(zipObj.zip);
+            resolve(result);
+          } catch (error) {
+            console.warn('🎯 Failed to geocode ZIP:', zipObj.zip, error);
+            resolve(null);
+          }
+        });
+      });
+
+      const geocodeResults = await Promise.all(geocodePromises);
+      const validResults = geocodeResults.filter(result => result !== null);
+
+      if (validResults.length > 0) {
+        // Calculate bounding box that encompasses all geocoded locations
+        let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+
+        validResults.forEach(result => {
+          const [lng, lat] = result.center;
+          minLng = Math.min(minLng, lng);
+          maxLng = Math.max(maxLng, lng);
+          minLat = Math.min(minLat, lat);
+          maxLat = Math.max(maxLat, lat);
+        });
+
+        console.log('🎯 Territory bounds calculated:', [minLng, minLat, maxLng, maxLat]);
+
+        // Fit bounds with padding to ensure territory fits within screen
+        map.fitBounds(
+          [
+            [minLng, minLat], // southwest
+            [maxLng, maxLat]  // northeast
+          ],
+          {
+            padding: 100, // More padding for territories
+            maxZoom: 12,  // Don't zoom in too close for large territories
+            duration: 1500
+          }
+        );
+
+        console.log('🎯 Fitted bounds for multi-ZIP territory');
+        return;
+      }
+    }
+
+    // Fallback: single ZIP or geocoding failed - use first ZIP geocoding
+    const firstZip = territory.zips[0].zip;
+    console.log('🎯 Using single ZIP geocoding for:', firstZip);
+
     const geocodeResult = await geocodeAndZoom(firstZip, map);
 
     if (!geocodeResult) {
@@ -1527,9 +1610,9 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       // Fallback to the old geocoding approach if geocoding fails
       geocodeAndZoomToTerritory(territory, map);
     } else {
-      console.log('🎯 Successfully zoomed to territory using geocoding');
+      console.log('🎯 Successfully zoomed to territory using single ZIP geocoding');
     }
-  }, [territories, geocodeAndZoom]);
+  }, [territories, geocodeLocation]);
 
   // Function to estimate coordinates for unknown ZIP prefixes based on USPS regions
   // This covers all 50 states with accurate regional mappings
