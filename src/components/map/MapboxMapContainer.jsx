@@ -775,6 +775,108 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     });
   }, [isVectorSourceLoaded]);
 
+  // Helper function to geocode a location and zoom to it using Mapbox Geocoding API
+  const geocodeAndZoom = useCallback(async (query, map) => {
+    if (!query || !query.trim()) {
+      console.log('🔍 Empty search query, skipping geocode');
+      return null;
+    }
+
+    const trimmedQuery = query.trim();
+    console.log('🔍 Geocoding query:', trimmedQuery);
+
+    try {
+      // Encode the query for URL
+      const encodedQuery = encodeURIComponent(trimmedQuery);
+
+      // Build the geocoding URL
+      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=us&types=postcode,place,region&limit=5`;
+
+      console.log('🔍 Making geocoding request to:', geocodingUrl.replace(MAPBOX_ACCESS_TOKEN, '[TOKEN]'));
+
+      const response = await fetch(geocodingUrl);
+      const data = await response.json();
+
+      if (!data.features || data.features.length === 0) {
+        console.log('🔍 No geocoding results found for:', trimmedQuery);
+        return null;
+      }
+
+      console.log('🔍 Found', data.features.length, 'geocoding results');
+
+      // Prefer results in this order: postcode, place, region
+      let selectedFeature = null;
+
+      // First, try to find a postcode result
+      selectedFeature = data.features.find(f => f.place_type.includes('postcode'));
+
+      // If no postcode, try place
+      if (!selectedFeature) {
+        selectedFeature = data.features.find(f => f.place_type.includes('place'));
+      }
+
+      // If no place, try region
+      if (!selectedFeature) {
+        selectedFeature = data.features.find(f => f.place_type.includes('region'));
+      }
+
+      // If still no match, use the first result
+      if (!selectedFeature) {
+        selectedFeature = data.features[0];
+      }
+
+      if (!selectedFeature) {
+        console.log('🔍 No suitable geocoding result found');
+        return null;
+      }
+
+      console.log('🔍 Selected geocoding result:', selectedFeature.place_name, 'Type:', selectedFeature.place_type);
+
+      const [lng, lat] = selectedFeature.center;
+      const bbox = selectedFeature.bbox;
+
+      console.log('🔍 Geocoded center:', [lng, lat]);
+      console.log('🔍 Geocoded bbox:', bbox);
+
+      // If we have a bbox, use fitBounds for better zoom
+      if (bbox && bbox.length === 4) {
+        const [minLng, minLat, maxLng, maxLat] = bbox;
+        map.fitBounds(
+          [
+            [minLng, minLat], // southwest
+            [maxLng, maxLat]  // northeast
+          ],
+          {
+            padding: 60, // Add padding around the bounds
+            maxZoom: 14, // Don't zoom in too close
+            duration: 1500 // Smooth animation
+          }
+        );
+        console.log('🔍 Fitted bounds to geocoded result');
+      } else {
+        // Fallback to flyTo with center and reasonable zoom
+        map.flyTo({
+          center: [lng, lat],
+          zoom: 10,
+          duration: 1500
+        });
+        console.log('🔍 Flew to geocoded center (no bbox available)');
+      }
+
+      // Return the geocoded result for tooltip positioning
+      return {
+        center: [lng, lat],
+        bbox: bbox,
+        placeName: selectedFeature.place_name,
+        placeType: selectedFeature.place_type
+      };
+
+    } catch (error) {
+      console.error('🔍 Error geocoding:', error);
+      return null;
+    }
+  }, []);
+
   // Helper function to get territory geometry and bounds from vector tiles
   const getTerritoryGeometry = useCallback(async (territory, map) => {
     console.log('🔍 Getting territory geometry for', territory.name, 'with', territory.zips.length, 'ZIPs');
@@ -1049,145 +1151,25 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       const stats = calculateTerritoryStats(territory);
       console.log('🔍 Territory stats - Population:', stats.population, 'Homes:', stats.homes, 'ZIPs:', stats.zipCount);
 
-      // Position popup at the territory's centroid using actual geometry
+      // Position popup at the geocoded center of the territory's first ZIP
       let centerLat, centerLng;
 
-      // Try to get actual geometry from vector tiles first
-      const territoryGeometry = await getTerritoryGeometry(territory, map);
+      // Use geocoding to get accurate center for tooltip
+      const firstZip = territory.zips[0].zip;
+      console.log('🔍 Geocoding first ZIP for tooltip positioning:', firstZip);
 
-      if (territoryGeometry && territoryGeometry.centroid) {
-        // Use the actual centroid from the unioned territory geometry
-        [centerLng, centerLat] = territoryGeometry.centroid;
-        console.log('🔍 Positioning tooltip at actual territory centroid:', [centerLng, centerLat], 'from geometry union');
+      const geocodeResult = await geocodeAndZoom(firstZip, map);
+
+      if (geocodeResult && geocodeResult.center) {
+        // Use the geocoded center for tooltip positioning
+        [centerLng, centerLat] = geocodeResult.center;
+        console.log('🔍 Positioning tooltip at geocoded center:', [centerLng, centerLat]);
       } else {
-        // Fallback to geocoding approach if geometry not available
-        console.log('🔍 No territory geometry available, falling back to geocoding for tooltip');
-
-        const coordinates = [];
-        let foundZips = 0;
-
-        // Use the same zipToCoords mapping as zoom function for fallback
-        const zipToCoords = {
-          // Texas Panhandle - more precise locations
-          '790': [35.22, -101.83], // Amarillo area
-          '791': [35.22, -101.83], // Amarillo
-          '792': [34.18, -101.72], // Plainview/Snyder area
-          '793': [33.58, -101.85], // Lubbock area
-          '794': [33.58, -101.85], // Lubbock
-          '795': [32.45, -99.73],  // Abilene area
-          '796': [32.45, -99.73],  // Abilene
-          '797': [31.99, -102.08], // Midland/Odessa
-          '798': [30.85, -104.02], // Fort Hancock area
-          '799': [31.76, -106.49], // El Paso area
-
-          // New Mexico
-          '870': [35.08, -106.65], // Albuquerque area
-          '871': [35.08, -106.65], // Albuquerque
-          '872': [35.08, -106.65], // Albuquerque
-          '873': [36.41, -107.05], // Crownpoint area
-          '874': [36.73, -108.22], // Farmington area
-          '875': [35.69, -105.94], // Santa Fe area
-          '876': [36.75, -108.18], // Navajo Nation area
-          '877': [34.41, -104.24], // Roswell area
-          '878': [33.28, -108.87], // Truth or Consequences area
-          '879': [32.78, -107.82], // Hillsboro area
-          '880': [32.28, -106.75], // Las Cruces area
-          '881': [33.41, -104.52], // Clovis/Portales area
-          '882': [32.89, -103.13], // Hobbs area
-          '883': [33.24, -105.66], // Ruidoso area
-          '884': [36.75, -103.98], // Raton area
-
-          // Kansas
-          '660': [38.96, -94.78],  // Kansas City, KS area
-          '661': [39.11, -94.76],  // Kansas City, KS
-          '662': [38.96, -94.78],  // Overland Park area
-          '664': [39.18, -96.60],  // Manhattan, KS area
-          '665': [39.05, -95.68],  // Topeka area
-          '666': [39.05, -95.68],  // Topeka
-          '667': [37.43, -94.71],  // Pittsburg, KS area
-          '668': [38.37, -95.65],  // Emporia area
-          '669': [39.78, -99.33],  // Hays area
-          '670': [37.69, -97.34],  // Wichita area
-          '671': [37.69, -97.34],  // Wichita
-          '672': [37.69, -97.34],  // Wichita
-          '673': [37.41, -95.27],  // Independence area
-          '674': [38.85, -97.61],  // Salina area
-          '675': [38.37, -98.78],  // Hutchinson area
-          '676': [39.36, -99.32],  // Hays area
-          '677': [39.78, -99.33],  // Hays
-          '678': [37.04, -100.93], // Liberal area
-          '679': [37.04, -100.93], // Liberal
-
-          // Arkansas
-          '716': [33.45, -91.50], // Monticello area
-          '717': [33.25, -92.70], // El Dorado area
-          '718': [35.25, -90.70], // Jonesboro area
-          '719': [34.50, -93.00], // Hot Springs area
-          '720': [34.75, -92.30], // Little Rock area
-          '721': [34.75, -92.30], // Little Rock
-          '722': [34.75, -92.30], // Little Rock
-          '723': [35.15, -90.20], // West Memphis area
-          '724': [35.75, -89.95], // Blytheville area
-          '725': [35.80, -91.65], // Batesville area
-          '726': [36.25, -92.35], // Mountain Home area
-          '727': [36.35, -94.20], // Fayetteville area
-          '728': [35.30, -93.15], // Russellville area
-          '729': [35.40, -94.45], // Fort Smith area
-          '755': [33.45, -94.05], // Texarkana, AR area
-
-          // Oklahoma - more precise
-          '730': [35.47, -97.52],  // Oklahoma City metro
-          '731': [35.47, -97.52],  // Oklahoma City
-          '732': [35.47, -97.52],  // Oklahoma City
-          '733': [35.47, -97.52],  // Oklahoma City
-          '734': [34.00, -96.40],  // Durant/Sherman area
-          '735': [34.62, -98.42],  // Lawton area
-          '736': [35.52, -99.64],  // Clinton area
-          '737': [36.40, -97.88],  // Enid area
-          '738': [36.75, -99.90],  // Guymon area
-          '739': [36.70, -101.40], // Boise City area
-          '740': [36.06, -95.78],  // Tulsa area
-          '741': [36.06, -95.78],  // Tulsa
-          '742': [36.06, -95.78],  // Tulsa
-          '743': [36.87, -94.88],  // Miami area
-          '744': [35.75, -95.37],  // Muskogee area
-          '745': [34.50, -95.60],  // McAlester area
-          '746': [36.72, -97.08],  // Ponca City area
-          '747': [33.99, -96.40],  // Durant
-          '748': [35.50, -96.70],  // Prague/Seminole area
-          '749': [35.92, -94.97],  // Tahlequah area
-        };
-
-        // Try to get coordinates for each ZIP (same logic as zoom)
-        territory.zips.forEach(zipObj => {
-          const fullZip = zipObj.zip.toString();
-          const zipPrefix = fullZip.substring(0, 3);
-          // First check for full 5-digit ZIP, then fall back to 3-digit prefix
-          let coords = zipToCoords[fullZip] || zipToCoords[zipPrefix];
-
-          if (coords) {
-            coordinates.push(coords);
-            foundZips++;
-          } else {
-            // Fall back to estimation
-            const estimatedCoords = estimateCoordsFromZip(zipPrefix);
-            coordinates.push(estimatedCoords);
-            foundZips++;
-          }
-        });
-
-        if (coordinates.length === 0) {
-          // Fallback to map center if no coordinates found
-          const mapCenter = map.getCenter();
-          centerLng = mapCenter.lng;
-          centerLat = mapCenter.lat;
-          console.log('🔍 No ZIP coordinates found, using map center for tooltip');
-        } else {
-          // Fall back to geocoded coordinate centroid
-          centerLat = coordinates.reduce((sum, coord) => sum + coord[0], 0) / coordinates.length;
-          centerLng = coordinates.reduce((sum, coord) => sum + coord[1], 0) / coordinates.length;
-          console.log('🔍 Using geocoded center as fallback:', [centerLng, centerLat], 'from', foundZips, 'ZIP coordinates');
-        }
+        // Fallback to map center if geocoding fails
+        const mapCenter = map.getCenter();
+        centerLng = mapCenter.lng;
+        centerLat = mapCenter.lat;
+        console.log('🔍 Geocoding failed, using map center for tooltip:', [centerLng, centerLat]);
       }
       console.log('🔍 POPUP CONTENT PREP - Territory:', territory.name, 'Population:', stats.population, 'Homes:', stats.homes, 'ZIPs:', stats.zipCount);
 
@@ -1550,34 +1532,21 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
     const map = mapRef.current.getMap();
 
-    // First try to get actual geometry from vector tiles
-    const territoryGeometry = await getTerritoryGeometry(territory, map);
+    // Use the first ZIP code from the territory for geocoding
+    const firstZip = territory.zips[0].zip;
+    console.log('🎯 Using first ZIP for geocoding:', firstZip);
 
-    if (territoryGeometry) {
-      console.log('🎯 Using actual territory geometry for zoom');
+    // Use geocoding API to zoom to the territory location
+    const geocodeResult = await geocodeAndZoom(firstZip, map);
 
-      // Use fitBounds to zoom to show the entire territory
-      const [minLng, minLat, maxLng, maxLat] = territoryGeometry.bbox;
-
-      map.fitBounds(
-        [
-          [minLng, minLat], // southwest
-          [maxLng, maxLat]  // northeast
-        ],
-        {
-          padding: 50, // Add padding around the bounds
-          maxZoom: 12, // Don't zoom in too close
-          duration: 1500 // Smooth animation
-        }
-      );
-
-      console.log('🎯 Fitted bounds to territory:', [minLng, minLat, maxLng, maxLat]);
-    } else {
-      // Fallback to geocoding approach if geometry not available
-      console.log('🎯 Falling back to geocoding approach');
+    if (!geocodeResult) {
+      console.log('🎯 Geocoding failed for territory, using fallback');
+      // Fallback to the old geocoding approach if geocoding fails
       geocodeAndZoomToTerritory(territory, map);
+    } else {
+      console.log('🎯 Successfully zoomed to territory using geocoding');
     }
-  }, [territories, getTerritoryGeometry]);
+  }, [territories, geocodeAndZoom]);
 
   // Function to estimate coordinates for unknown ZIP prefixes based on USPS regions
   // This covers all 50 states with accurate regional mappings
@@ -2342,6 +2311,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     enterAddMode,
     exitAddMode,
     isInAddMode: () => !!localAddModeTerritoryIdRef.current,
+    geocodeAndZoom,
   }));
 
   // Handle viewport changes

@@ -23,6 +23,53 @@ function App() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
+  // Search functionality state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Debounce ref for search
+  const searchTimeoutRef = useRef(null);
+
+  // Search handler with debounce
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery.trim() || searchLoading) return;
+
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    setSearchLoading(true);
+    try {
+      if (mapContainerRef.current) {
+        const result = await mapContainerRef.current.geocodeAndZoom(searchQuery.trim());
+        if (!result) {
+          alert(`No results found for "${searchQuery}". Try a different search term.`);
+        } else {
+          console.log('Search completed successfully:', result.placeName);
+        }
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      alert('Search failed. Please try again.');
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [searchQuery, searchLoading]);
+
+  // Debounced search handler (300ms delay)
+  const handleDebouncedSearch = useCallback(() => {
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout
+    searchTimeoutRef.current = setTimeout(() => {
+      handleSearch();
+    }, 300);
+  }, [handleSearch]);
+
   const handleSetAddModeTerritoryId = (value) => {
     console.log('🚨 App.jsx setAddModeTerritoryId called with:', value, 'previous value:', addModeTerritoryId, 'stack trace:', new Error().stack);
     setAddModeTerritoryId(value);
@@ -260,6 +307,15 @@ function App() {
     loadSavedProfiles();
   }, [loadSavedProfiles]);
 
+  // Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     console.log('Sidebar element exists?', document.querySelector('.sidebar'));
     console.log('Sidebar width:', document.querySelector('.sidebar')?.offsetWidth);
@@ -292,6 +348,11 @@ function App() {
         loadingProfiles={loadingProfiles}
         savingProfile={savingProfile}
         loadingProfile={loadingProfile}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        searchLoading={searchLoading}
+        setSearchLoading={setSearchLoading}
+        onSearch={handleDebouncedSearch}
       />
       <div className="map-wrapper" style={{ flex: 1, height: '100%', position: 'relative' }}>
         <MapboxMapContainer
