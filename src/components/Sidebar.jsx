@@ -1,20 +1,5 @@
 import React from 'react';
 
-// Add CSS animation for loading spinner
-const spinnerStyle = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-
-// Inject the CSS
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = spinnerStyle;
-  document.head.appendChild(style);
-}
-
 export default function Sidebar({
   territories,
   activeTerritoryId,
@@ -35,11 +20,6 @@ export default function Sidebar({
   loadingProfiles,
   savingProfile,
   loadingProfile,
-  searchQuery,
-  setSearchQuery,
-  searchLoading,
-  setSearchLoading,
-  onSearch,
 }) {
   console.log('Sidebar received profile props:', { savedProfiles, onSaveProfile, showLoadProfile });
   // Debug: log territories received by sidebar
@@ -186,68 +166,6 @@ export default function Sidebar({
         Create New Territory
       </button>
 
-      {/* Search Bar */}
-      <div style={{ marginBottom: '1rem' }}>
-        <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
-          Search Location
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ZIP, city, state..."
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '0.875rem',
-              outline: 'none',
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                onSearch();
-              }
-            }}
-            disabled={searchLoading}
-          />
-          <button
-            type="button"
-            onClick={onSearch}
-            disabled={!searchQuery.trim() || searchLoading}
-            style={{
-              padding: '8px 12px',
-              background: searchQuery.trim() && !searchLoading ? '#3b82f6' : '#9ca3af',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              cursor: searchQuery.trim() && !searchLoading ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            {searchLoading ? (
-              <>
-                <div style={{
-                  width: '12px',
-                  height: '12px',
-                  border: '2px solid #ffffff',
-                  borderTop: '2px solid transparent',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                }} />
-                Searching...
-              </>
-            ) : (
-              '🔍'
-            )}
-          </button>
-        </div>
-      </div>
 
       <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>
         Territories ({territories.length})

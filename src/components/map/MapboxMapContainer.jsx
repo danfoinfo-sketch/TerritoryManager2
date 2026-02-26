@@ -776,12 +776,18 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
   }, [isVectorSourceLoaded]);
 
   // Helper function to geocode a location and zoom to it using Mapbox Geocoding API
-  const geocodeAndZoom = useCallback(async (query, map) => {
+  const geocodeAndZoom = useCallback(async (query) => {
     if (!query || !query.trim()) {
       console.log('🔍 Empty search query, skipping geocode');
       return null;
     }
 
+    if (!mapRef.current) {
+      console.log('🔍 Map not ready for geocoding');
+      return null;
+    }
+
+    const map = mapRef.current.getMap();
     const trimmedQuery = query.trim();
     console.log('🔍 Geocoding query:', trimmedQuery);
 
@@ -790,7 +796,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       const encodedQuery = encodeURIComponent(trimmedQuery);
 
       // Build the geocoding URL
-      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=us&types=postcode,place,region&limit=5`;
+      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=us&types=postcode,place,region&limit=1`;
 
       console.log('🔍 Making geocoding request to:', geocodingUrl.replace(MAPBOX_ACCESS_TOKEN, '[TOKEN]'));
 
@@ -804,31 +810,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
       console.log('🔍 Found', data.features.length, 'geocoding results');
 
-      // Prefer results in this order: postcode, place, region
-      let selectedFeature = null;
-
-      // First, try to find a postcode result
-      selectedFeature = data.features.find(f => f.place_type.includes('postcode'));
-
-      // If no postcode, try place
-      if (!selectedFeature) {
-        selectedFeature = data.features.find(f => f.place_type.includes('place'));
-      }
-
-      // If no place, try region
-      if (!selectedFeature) {
-        selectedFeature = data.features.find(f => f.place_type.includes('region'));
-      }
-
-      // If still no match, use the first result
-      if (!selectedFeature) {
-        selectedFeature = data.features[0];
-      }
-
-      if (!selectedFeature) {
-        console.log('🔍 No suitable geocoding result found');
-        return null;
-      }
+      // Take the first result (limit=1 so should only be one)
+      const selectedFeature = data.features[0];
 
       console.log('🔍 Selected geocoding result:', selectedFeature.place_name, 'Type:', selectedFeature.place_type);
 
@@ -847,7 +830,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
             [maxLng, maxLat]  // northeast
           ],
           {
-            padding: 60, // Add padding around the bounds
+            padding: 80, // Add padding around the bounds
             maxZoom: 14, // Don't zoom in too close
             duration: 1500 // Smooth animation
           }
@@ -863,7 +846,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         console.log('🔍 Flew to geocoded center (no bbox available)');
       }
 
-      // Return the geocoded result for tooltip positioning
+      // Return the geocoded result for potential use
       return {
         center: [lng, lat],
         bbox: bbox,

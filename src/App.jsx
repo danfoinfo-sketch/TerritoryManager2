@@ -4,6 +4,21 @@ import Sidebar from './components/Sidebar';
 import { db } from './firebase';
 import { collection, setDoc, getDocs, getDoc, doc, serverTimestamp } from 'firebase/firestore';
 
+// Add CSS animation for loading spinner
+const spinnerStyle = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// Inject the CSS
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = spinnerStyle;
+  document.head.appendChild(style);
+}
+
 const TERRITORY_COLORS = [
   "#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6",
   "#06b6d4", "#f43f5e", "#22c55e", "#3b82f6", "#a855f7",
@@ -30,23 +45,20 @@ function App() {
   // Debounce ref for search
   const searchTimeoutRef = useRef(null);
 
-  // Search handler with debounce
+  // Search handler
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim() || searchLoading) return;
-
-    // Clear any existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
 
     setSearchLoading(true);
     try {
       if (mapContainerRef.current) {
         const result = await mapContainerRef.current.geocodeAndZoom(searchQuery.trim());
         if (!result) {
-          alert(`No results found for "${searchQuery}". Try a different search term.`);
+          alert(`No location found for "${searchQuery}". Try a different search term.`);
         } else {
           console.log('Search completed successfully:', result.placeName);
+          // Clear input after successful search
+          setSearchQuery('');
         }
       }
     } catch (error) {
@@ -57,17 +69,21 @@ function App() {
     }
   }, [searchQuery, searchLoading]);
 
-  // Debounced search handler (300ms delay)
-  const handleDebouncedSearch = useCallback(() => {
+  // Debounced search handler for input changes (300ms delay)
+  const handleSearchInput = useCallback((value) => {
+    setSearchQuery(value);
+
     // Clear existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // Set new timeout
-    searchTimeoutRef.current = setTimeout(() => {
-      handleSearch();
-    }, 300);
+    // Only set timeout if there's actual input
+    if (value.trim()) {
+      searchTimeoutRef.current = setTimeout(() => {
+        handleSearch();
+      }, 300);
+    }
   }, [handleSearch]);
 
   const handleSetAddModeTerritoryId = (value) => {
@@ -323,6 +339,73 @@ function App() {
 
   return (
     <div className="app-container" style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+      {/* Search Bar Overlay */}
+      <div style={{
+        position: 'absolute',
+        top: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1000,
+        width: '350px',
+        maxWidth: '90vw',
+      }}>
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          background: 'white',
+          borderRadius: '8px',
+          padding: '8px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          border: '1px solid #e5e7eb',
+        }}>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearchInput(e.target.value)}
+            placeholder="Search ZIP, city, state..."
+            style={{
+              flex: 1,
+              border: 'none',
+              outline: 'none',
+              fontSize: '16px',
+              padding: '4px 8px',
+              background: 'transparent',
+            }}
+            disabled={searchLoading}
+          />
+          <button
+            type="button"
+            onClick={handleSearch}
+            disabled={!searchQuery.trim() || searchLoading}
+            style={{
+              padding: '8px',
+              background: searchQuery.trim() && !searchLoading ? '#3b82f6' : '#9ca3af',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: searchQuery.trim() && !searchLoading ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+            }}
+          >
+            {searchLoading ? (
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid #ffffff',
+                borderTop: '2px solid transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }} />
+            ) : (
+              '🔍'
+            )}
+          </button>
+        </div>
+      </div>
+
       <Sidebar
         className="sidebar"
         style={{ width: 300, height: '100vh', zIndex: 1000, background: 'white', overflowY: 'auto', boxShadow: '2px 0 5px rgba(0,0,0,0.1)', flexShrink: 0 }}
@@ -348,11 +431,6 @@ function App() {
         loadingProfiles={loadingProfiles}
         savingProfile={savingProfile}
         loadingProfile={loadingProfile}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        searchLoading={searchLoading}
-        setSearchLoading={setSearchLoading}
-        onSearch={handleDebouncedSearch}
       />
       <div className="map-wrapper" style={{ flex: 1, height: '100%', position: 'relative' }}>
         <MapboxMapContainer
