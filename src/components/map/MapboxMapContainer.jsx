@@ -815,9 +815,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       }
 
       console.log('🔍 Territory has', territory.zips.length, 'ZIPs');
-      console.log('🔍 Territory ZIPs data:', territory.zips.map(z => ({ zip: z.zip, pop: z.pop, houses: z.standAloneHouses })));
       const stats = calculateTerritoryStats(territory);
-      console.log('🔍 Calculated stats:', stats);
+      console.log('🔍 Territory stats - Population:', stats.population, 'Homes:', stats.homes, 'ZIPs:', stats.zipCount);
 
       // Position popup at the territory's center location using same logic as zoom
       const coordinates = [];
@@ -968,6 +967,9 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           .setLngLat([centerLng, centerLat])
           .setHTML(popupHtml)
           .addTo(map);
+
+        console.log('🔍 Popup added to map at coordinates:', [centerLng, centerLat]);
+        console.log('🔍 Popup element created:', !!popup.getElement());
 
         // Implement custom drag functionality
         let isDragging = false;
