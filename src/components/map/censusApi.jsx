@@ -43,9 +43,52 @@ export const fetchZipPopulationAndHouses = async (zip) => {
     throw new Error(`Invalid ZIP code format: ${zip}`);
   }
 
+  // Test API key with a known working ZIP code first
+  if (zip !== '10001') { // Avoid infinite loop
+    try {
+      console.log(`Testing API key with known ZIP 10001...`);
+      const testResponse = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:10001&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+      if (testResponse.ok) {
+        console.log(`✅ API key is working (tested with ZIP 10001)`);
+        const testData = await testResponse.json();
+        console.log(`Test data for 10001: Population=${testData[1][0]}, Houses=${testData[1][1]}`);
+      } else {
+        console.log(`❌ API key test failed with ZIP 10001: ${testResponse.status}`);
+      }
+    } catch (testError) {
+      console.log(`❌ API key test error:`, testError.message);
+    }
+  }
+
   try {
     console.log(`Fetching census data for ZIP: ${zip}`);
-    const response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+
+    // First try with ZCTA (most common)
+    let response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+
+    // If ZCTA fails, try with zip code tabulation area
+    if (!response.ok) {
+      console.log(`ZCTA failed for ${zip}, trying zip code tabulation area...`);
+      response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zip%20code%20tabulation%20area:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+    }
+
+    // If that fails, try 2020 ACS
+    if (!response.ok) {
+      console.log(`ZIP Code Tabulation Area failed for ${zip}, trying 2020 ACS...`);
+      response = await fetch(`https://api.census.gov/data/2020/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+    }
+
+    // If that fails, try 2020 Decennial Census
+    if (!response.ok) {
+      console.log(`2020 ACS failed for ${zip}, trying 2020 Decennial Census...`);
+      response = await fetch(`https://api.census.gov/data/2020/dec/pl?get=P1_001N,H1_001N&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+    }
+
+    // If that fails, try without ZCTA prefix (direct ZIP)
+    if (!response.ok) {
+      console.log(`Decennial Census failed for ${zip}, trying direct ZIP lookup...`);
+      response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zip%20code:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+    }
 
     if (!response.ok) {
       console.warn(`API returned ${response.status} for ZIP ${zip}`);
@@ -59,8 +102,21 @@ export const fetchZipPopulationAndHouses = async (zip) => {
       throw new Error('Invalid API response format');
     }
 
-    const population = parseInt(data[1][0]) || 0;
-    const standAloneHouses = parseInt(data[1][1]) || 0;
+    // Parse data based on the API response format
+    let population, standAloneHouses;
+
+    // Check if this is Decennial Census data (different field names)
+    if (data[0].includes('P1_001N')) {
+      // 2020 Decennial Census: P1_001N = population, H1_001N = housing units
+      population = parseInt(data[1][0]) || 0;
+      standAloneHouses = parseInt(data[1][1]) || 0;
+      console.log(`Using 2020 Decennial Census data for ZIP ${zip}`);
+    } else {
+      // ACS data: B01003_001E = population, B25024_002E = detached homes
+      population = parseInt(data[1][0]) || 0;
+      standAloneHouses = parseInt(data[1][1]) || 0;
+      console.log(`Using ACS data for ZIP ${zip}`);
+    }
 
     const result = { population, standAloneHouses };
     console.log(`Parsed data for ZIP ${zip}:`, result);
