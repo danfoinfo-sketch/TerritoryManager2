@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import MapboxMapContainer from './components/map/MapboxMapContainer';
 import Sidebar from './components/Sidebar';
 import { db } from './firebase';
@@ -42,9 +42,6 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
 
-  // Debounce ref for search
-  const searchTimeoutRef = useRef(null);
-
   // Search handler
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim() || searchLoading) return;
@@ -68,23 +65,6 @@ function App() {
       setSearchLoading(false);
     }
   }, [searchQuery, searchLoading]);
-
-  // Debounced search handler for input changes (300ms delay)
-  const handleSearchInput = useCallback((value) => {
-    setSearchQuery(value);
-
-    // Clear existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    // Only set timeout if there's actual input
-    if (value.trim()) {
-      searchTimeoutRef.current = setTimeout(() => {
-        handleSearch();
-      }, 300);
-    }
-  }, [handleSearch]);
 
   const handleSetAddModeTerritoryId = (value) => {
     console.log('🚨 App.jsx setAddModeTerritoryId called with:', value, 'previous value:', addModeTerritoryId, 'stack trace:', new Error().stack);
@@ -323,15 +303,6 @@ function App() {
     loadSavedProfiles();
   }, [loadSavedProfiles]);
 
-  // Cleanup search timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     console.log('Sidebar element exists?', document.querySelector('.sidebar'));
     console.log('Sidebar width:', document.querySelector('.sidebar')?.offsetWidth);
@@ -361,7 +332,7 @@ function App() {
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => handleSearchInput(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search ZIP, city, state..."
             style={{
               flex: 1,
@@ -370,6 +341,11 @@ function App() {
               fontSize: '16px',
               padding: '4px 8px',
               background: 'transparent',
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSearch();
+              }
             }}
             disabled={searchLoading}
           />
