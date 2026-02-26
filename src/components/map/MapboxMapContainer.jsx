@@ -1064,7 +1064,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     processingZipsRef.current.add(zipCode);
     setIsProcessingZip(true);
 
-    // Add ZIP immediately with placeholder data for instant UI response
+    try {
+      // Add ZIP immediately with placeholder data for instant UI response
     console.log('🖱️ Adding ZIP immediately with placeholder data:', zipCode);
     addZipToActiveTerritory(zipCode, 0, 0, localAddModeTerritoryIdRef.current);
 
