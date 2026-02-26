@@ -791,10 +791,13 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       const data = await response.json();
 
       if (!data.features || data.features.length === 0) {
+        console.log('❌ No geocoding results for:', trimmedQuery);
         return null;
       }
 
       const selectedFeature = data.features[0];
+      console.log('✅ Geocoded', trimmedQuery, 'to:', selectedFeature.place_name, 'at', selectedFeature.center);
+
       return {
         center: selectedFeature.center, // [lng, lat]
         bbox: selectedFeature.bbox,
@@ -1567,6 +1570,15 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       const geocodeResults = await Promise.all(geocodePromises);
       const validResults = geocodeResults.filter(result => result !== null);
 
+      console.log('🎯 Geocoding results summary:');
+      console.log('🎯 - Total ZIPs:', territory.zips.length);
+      console.log('🎯 - Successful geocodes:', validResults.length);
+      console.log('🎯 - Failed geocodes:', geocodeResults.length - validResults.length);
+
+      validResults.forEach((result, index) => {
+        console.log(`🎯 ZIP ${territory.zips[index].zip} -> [${result.center[1].toFixed(4)}, ${result.center[0].toFixed(4)}]`);
+      });
+
       if (validResults.length > 0) {
         // Calculate bounding box that encompasses all geocoded locations
         let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
@@ -1581,20 +1593,49 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
         console.log('🎯 Territory bounds calculated:', [minLng, minLat, maxLng, maxLat]);
 
-        // Fit bounds with padding to ensure territory fits within screen
-        map.fitBounds(
-          [
-            [minLng, minLat], // southwest
-            [maxLng, maxLat]  // northeast
-          ],
-          {
-            padding: 100, // More padding for territories
-            maxZoom: 12,  // Don't zoom in too close for large territories
-            duration: 1500
-          }
-        );
+        // Calculate the bounds dimensions
+        const lngRange = maxLng - minLng;
+        const latRange = maxLat - minLat;
+        const maxRange = Math.max(lngRange, latRange);
 
-        console.log('🎯 Fitted bounds for multi-ZIP territory');
+        console.log('🎯 Bounds dimensions - Lng range:', lngRange.toFixed(4), 'Lat range:', latRange.toFixed(4), 'Max range:', maxRange.toFixed(4));
+
+        // Determine zoom level based on the territory size
+        let targetZoom = 10; // Default zoom level
+
+        if (maxRange < 0.01) {
+          targetZoom = 14; // Very small territory (single ZIP)
+        } else if (maxRange < 0.1) {
+          targetZoom = 12; // Small territory
+        } else if (maxRange < 1) {
+          targetZoom = 10; // Medium territory
+        } else if (maxRange < 5) {
+          targetZoom = 8;  // Large territory
+        } else {
+          targetZoom = 6;  // Very large territory
+        }
+
+        console.log('🎯 Calculated target zoom level:', targetZoom, 'based on max range:', maxRange.toFixed(4));
+
+        // Fit bounds with generous padding to ensure territory fits within screen
+        // Add some buffer to the bounds to ensure padding works properly
+        const lngBuffer = lngRange * 0.1; // 10% buffer
+        const latBuffer = latRange * 0.1; // 10% buffer
+
+        const bufferedBounds = [
+          [minLng - lngBuffer, minLat - latBuffer], // southwest with buffer
+          [maxLng + lngBuffer, maxLat + latBuffer]  // northeast with buffer
+        ];
+
+        console.log('🎯 Using buffered bounds:', bufferedBounds, 'with buffers:', [lngBuffer, latBuffer]);
+
+        map.fitBounds(bufferedBounds, {
+          padding: 100, // Additional padding around buffered bounds
+          maxZoom: Math.min(targetZoom, 10), // More conservative max zoom
+          duration: 1500
+        });
+
+        console.log('🎯 Fitted bounds for multi-ZIP territory with zoom level:', Math.min(targetZoom, 12));
         return;
       }
     }
@@ -1603,14 +1644,24 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     const firstZip = territory.zips[0].zip;
     console.log('🎯 Using single ZIP geocoding for:', firstZip);
 
-    const geocodeResult = await geocodeAndZoom(firstZip, map);
+    const geocodeResult = await geocodeLocation(firstZip);
 
-    if (!geocodeResult) {
-      console.log('🎯 Geocoding failed for territory, using fallback');
+    if (geocodeResult) {
+      const [lng, lat] = geocodeResult.center;
+      console.log('🎯 Geocoded single ZIP to center:', [lng, lat]);
+
+      // For single ZIP, use a lower zoom level to show surrounding area
+      map.flyTo({
+        center: [lng, lat],
+        zoom: 9, // Lower zoom for single ZIP territories to show more context
+        duration: 1500
+      });
+
+      console.log('🎯 Flew to single ZIP territory at zoom level 11');
+    } else {
+      console.log('🎯 Geocoding failed for territory, using coordinate fallback');
       // Fallback to the old geocoding approach if geocoding fails
       geocodeAndZoomToTerritory(territory, map);
-    } else {
-      console.log('🎯 Successfully zoomed to territory using single ZIP geocoding');
     }
   }, [territories, geocodeLocation]);
 
