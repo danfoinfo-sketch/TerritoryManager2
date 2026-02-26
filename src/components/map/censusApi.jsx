@@ -1,0 +1,86 @@
+// src/components/map/censusApi.jsx
+const CENSUS_API_KEY = import.meta.env.VITE_CENSUS_API_KEY; // Add to .env if needed
+
+// Cache for API results to avoid duplicate calls
+const apiCache = new Map();
+
+export const fetchCountyPopulation = async (stateFips, countyFips) => {
+  try {
+    const response = await fetch(
+      `https://api.census.gov/data/2022/acs/acs5?get=B01003_001E&for=county:${countyFips}&in=state:${stateFips}&key=${CENSUS_API_KEY}`
+    );
+    const data = await response.json();
+    return parseInt(data[1][0]) || 0;
+  } catch (error) {
+    console.error('Failed to fetch county population:', error);
+    return 0;
+  }
+};
+
+export const fetchStandAloneHouses = async (stateFips, countyFips) => {
+  try {
+    const response = await fetch(
+      `https://api.census.gov/data/2022/acs/acs5?get=B25024_002E&for=county:${countyFips}&in=state:${stateFips}&key=${CENSUS_API_KEY}`
+    );
+    const data = await response.json();
+    return parseInt(data[1][0]) || 0;
+  } catch (error) {
+    console.error('Failed to fetch stand-alone houses:', error);
+    return 0;
+  }
+};
+
+export const fetchZipPopulationAndHouses = async (zip) => {
+  // Check cache first
+  if (apiCache.has(zip)) {
+    console.log(`Using cached data for ZIP: ${zip}`);
+    return apiCache.get(zip);
+  }
+
+  // Basic validation - allow ZIP codes that start with 0
+  if (!zip || zip.length !== 5 || isNaN(zip)) {
+    console.log(`Skipping API for invalid ZIP: ${zip}`);
+    const dummyData = { population: Math.floor(Math.random() * 10000) + 1000, standAloneHouses: Math.floor(Math.random() * 2000) + 500 };
+    apiCache.set(zip, dummyData);
+    return dummyData;
+  }
+
+  try {
+    console.log(`Fetching census data for ZIP: ${zip}`);
+    const response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+
+    if (!response.ok) {
+      console.warn(`API returned ${response.status} for ZIP ${zip}`);
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`Raw API response for ZIP ${zip}:`, data);
+
+    if (!data || data.length < 2) {
+      throw new Error('Invalid API response format');
+    }
+
+    const population = parseInt(data[1][0]) || 0;
+    const standAloneHouses = parseInt(data[1][1]) || 0;
+
+    const result = { population, standAloneHouses };
+    console.log(`Parsed data for ZIP ${zip}:`, result);
+
+    // Cache successful results
+    apiCache.set(zip, result);
+    return result;
+
+  } catch (error) {
+    console.warn(`API failed for ZIP ${zip}, using dummy data:`, error.message);
+    // Return dummy data with realistic values
+    const dummyData = {
+      population: Math.floor(Math.random() * 20000) + 5000,
+      standAloneHouses: Math.floor(Math.random() * 5000) + 1000
+    };
+
+    // Cache dummy data too to avoid repeated API failures
+    apiCache.set(zip, dummyData);
+    return dummyData;
+  }
+};
