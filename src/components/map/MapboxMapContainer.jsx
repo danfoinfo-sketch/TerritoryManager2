@@ -968,7 +968,6 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           .setLngLat([centerLng, centerLat])
           .setHTML(popupHtml)
           .addTo(map);
-          .addTo(map);
 
         // Implement custom drag functionality
         let isDragging = false;
