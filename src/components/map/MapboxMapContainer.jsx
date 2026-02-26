@@ -2149,17 +2149,21 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       {/* ZIP info popup - positioned near click location */}
       {popupInfo && popupInfo.lngLat && mapRef.current && (() => {
         console.log('🎯 Rendering tooltip for:', popupInfo);
+        const point = mapRef.current.getMap().project([popupInfo.lngLat.lng, popupInfo.lngLat.lat]);
+        console.log('📍 Tooltip position (pixels):', point.x, point.y, 'from coords:', popupInfo.lngLat.lng, popupInfo.lngLat.lat);
         return true;
       })() && (
         <div
           className="zip-tooltip"
           style={{
             position: "absolute",
+            zIndex: 9999,
             left: (() => {
               try {
                 const point = mapRef.current.getMap().project([popupInfo.lngLat.lng, popupInfo.lngLat.lat]);
+                console.log('🗺️ Positioning tooltip at:', point.x + 10, point.y - 10);
                 // Position tooltip above and to the right of the click point
-                return point.x + 10;
+                return Math.max(10, point.x + 10); // Keep it on screen
               } catch (e) {
                 console.warn('Error projecting coordinates:', e);
                 return 100;
@@ -2169,7 +2173,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
               try {
                 const point = mapRef.current.getMap().project([popupInfo.lngLat.lng, popupInfo.lngLat.lat]);
                 // Position tooltip above the click point
-                return point.y - 10;
+                return Math.max(10, point.y - 10); // Keep it on screen
               } catch (e) {
                 console.warn('Error projecting coordinates:', e);
                 return 100;
@@ -2197,8 +2201,10 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
               Detached Homes: ~{popupInfo.standAloneHouses?.toLocaleString()} <small style={{color: '#666'}}>(est.)</small><br/>
               <small style={{color: '#666', fontSize: '0.8em'}}>No census data available</small>
             </div>
-          ) : (
-            <div style={{ position: 'relative' }}>
+          ) : (() => {
+            console.log('📝 Rendering real data tooltip content:', popupInfo);
+            return (
+            <div style={{ position: 'relative', background: 'white', padding: '8px', border: '1px solid black' }}>
               <button
                 onClick={() => {
                   // Just close tooltip (highlight stays via selectedZips)
@@ -2224,12 +2230,14 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
               >
                 ×
               </button>
-              <div>
+              <div style={{color: 'black'}}>
                 <strong>ZIP: {popupInfo.zip}</strong><br/>
                 Population: {popupInfo.population?.toLocaleString()}<br/>
                 Detached Homes: {popupInfo.standAloneHouses?.toLocaleString()}
               </div>
             </div>
+            );
+          })()
           )}
         </div>
       )}
