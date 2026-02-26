@@ -49,6 +49,8 @@ export default forwardRef(function MapboxMapContainer({
 
   // Track ZIPs currently being processed to prevent duplicate clicks
   const processingZipsRef = useRef(new Set());
+  // Prevent rapid clicking during ZIP processing
+  const [isProcessingZip, setIsProcessingZip] = useState(false);
   const [selectedZips, setSelectedZips] = useState([]); // Array of selected ZIP codes for filtering
   const [hoveredZip, setHoveredZip] = useState(null);
   const [tooltipZip, setTooltipZip] = useState(null);
@@ -140,86 +142,44 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       return territoryZips;
     });
 
-    // Update the highlight layer filter
+    // Update map layers efficiently - batch operations and reduce repaints
     if (mapRef.current) {
       const map = mapRef.current.getMap();
-      if (map.getLayer('zip-highlight')) {
-        map.setFilter('zip-highlight', ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', allSelectedZips.map(String)]]);
-        console.log('🗺️ Updated highlight filter for territories (type-safe):', allSelectedZips);
-        map.triggerRepaint();
-      } else {
-        console.log('🗺️ zip-highlight layer not found');
-      }
-      if (map.getLayer('zip-border')) {
-        map.setFilter('zip-border', ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', allSelectedZips.map(String)]]);
-        console.log('🗺️ Updated border filter for territories (type-safe):', allSelectedZips);
-        map.triggerRepaint();
-      }
-      // Update territory layers (mask and perimeter - clean outer border only)
-      if (map.getLayer('territory-mask')) {
-        map.setFilter('territory-mask', ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', allSelectedZips.map(String)]]);
-        console.log('🗺️ Updated territory mask for territories (type-safe):', allSelectedZips);
-      }
-      if (map.getLayer('territory-perimeter')) {
-        map.setFilter('territory-perimeter', ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', allSelectedZips.map(String)]]);
-        console.log('🗺️ Updated territory perimeter for territories (type-safe):', allSelectedZips);
-        map.triggerRepaint();
-      }
-      // Update zip-outlines-new for territories - try multiple approaches
-      if (map.getLayer('zip-outlines-new')) {
-        // Approach 1: Try filtering by ZCTA5CE20 property
-        map.setFilter('zip-outlines-new', ['!', ['in', ['get', 'ZCTA5CE20'], ['literal', allSelectedZips]]]);
+      const normalizedZips = allSelectedZips.map(String);
 
-        // Approach 2: If that doesn't work, try complete opacity hiding
-        map.setPaintProperty('zip-outlines-new', 'line-opacity', [
-          'case',
-          ['in', ['get', 'ZCTA5CE20'], ['literal', allSelectedZips]],
-          0.0, // COMPLETELY INVISIBLE for selected ZIPs
-          0.8  // Visible for non-selected ZIPs
-        ]);
+      // Batch filter updates to reduce repaints
+      const layersToUpdate = [
+        { id: 'zip-highlight', filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', normalizedZips]] },
+        { id: 'zip-border', filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', normalizedZips]] },
+        { id: 'territory-mask', filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', normalizedZips]] },
+        { id: 'territory-perimeter', filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', normalizedZips]] }
+      ];
 
-        // Approach 3: If still visible, completely hide the layer
-        if (allSelectedZips.length > 0) {
-          console.log('🔍 Boundary lines still visible, trying to hide layer completely');
-          map.setLayoutProperty('zip-outlines-new', 'visibility', 'none');
+      layersToUpdate.forEach(({ id, filter }) => {
+        if (map.getLayer(id)) {
+          map.setFilter(id, filter);
         }
+      });
 
-        console.log('Line layer filter/opacity applied — selected ZIPs excluded:', allSelectedZips);
-        map.triggerRepaint();
-
-        // Debug: Verify the update
-        setTimeout(() => {
-          try {
-            const currentFilter = map.getFilter('zip-outlines-new');
-            const currentOpacity = map.getPaintProperty('zip-outlines-new', 'line-opacity');
-            console.log('Updated line layer filter:', currentFilter);
-            console.log('Updated line layer opacity:', currentOpacity);
-
-            // Check if any boundary lines are still visible
-            const visibleLines = map.queryRenderedFeatures({
-              layers: ['zip-outlines-new']
-            });
-            console.log('Visible boundary lines after filter:', visibleLines ? visibleLines.length : 0);
-            if (visibleLines && visibleLines.length > 0) {
-              console.log('Sample visible boundary line properties:', visibleLines[0].properties);
-            }
-          } catch (error) {
-            console.log('Debug check failed:', error.message);
-          }
-        }, 100);
+      // Update outline layer visibility (optimized)
+      if (map.getLayer('zip-outlines-new')) {
+        if (normalizedZips.length > 0) {
+          // Hide outlines for selected ZIPs using opacity
+          map.setPaintProperty('zip-outlines-new', 'line-opacity', [
+            'case',
+            ['in', ['get', 'ZCTA5CE20'], ['literal', normalizedZips]],
+            0.0, // Invisible for selected
+            0.8  // Visible for others
+          ]);
+        } else {
+          // Show all outlines when no ZIPs selected
+          map.setPaintProperty('zip-outlines-new', 'line-opacity', 0.8);
+        }
       }
 
-      // Log ZIP property type check
-      if (allSelectedZips.length > 0) {
-        console.log('Selected ZIP sample type/value:', typeof allSelectedZips[0], allSelectedZips[0]);
-      }
-
-      // Force repaint for all territory layers
-      console.log('Mask & outline updates applied for', allSelectedZips.length, 'ZIPs');
+      // Single repaint at the end
       map.triggerRepaint();
-      // zip-outlines-new is now completely invisible, no need to update filters
-    } else {
-      console.log('🗺️ mapRef not available');
+      console.log('🗺️ Updated all territory layers for', normalizedZips.length, 'ZIPs');
     }
   }, [territories, addModeTerritoryId, activeTerritoryId]);
 
@@ -1089,6 +1049,12 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       const zipCode = e.features[0].properties[ZIP_PROPERTY];
     console.log('🖱️ ZIP click detected:', zipCode, 'localAddModeTerritoryId:', localAddModeTerritoryIdRef.current);
 
+    // Prevent rapid clicking
+    if (isProcessingZip) {
+      console.log('🖱️ ZIP processing in progress, ignoring click');
+      return;
+    }
+
     // Prevent duplicate processing of the same ZIP
     if (processingZipsRef.current.has(zipCode)) {
       console.log('🖱️ ZIP already being processed, ignoring:', zipCode);
@@ -1096,37 +1062,32 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     }
 
     processingZipsRef.current.add(zipCode);
+    setIsProcessingZip(true);
 
-    try {
-      console.log('🖱️ Fetching/caching data for ZIP:', zipCode);
-      let population, standAloneHouses;
+    // Add ZIP immediately with placeholder data for instant UI response
+    console.log('🖱️ Adding ZIP immediately with placeholder data:', zipCode);
+    addZipToActiveTerritory(zipCode, 0, 0, localAddModeTerritoryIdRef.current);
 
-      try {
-        const censusData = await fetchZipPopulationAndHouses(zipCode);
-        population = censusData.population;
-        standAloneHouses = censusData.standAloneHouses;
-        console.log('🖱️ Got real census data:', { population, standAloneHouses });
-      } catch (censusError) {
-        console.warn('🖱️ Census API failed, using placeholder values:', censusError.message);
-        // Use placeholder values when census data is unavailable
-        population = 0;
-        standAloneHouses = 0;
-      }
+    // Fetch census data asynchronously (non-blocking)
+    fetchZipPopulationAndHouses(zipCode).then(censusData => {
+      console.log('🖱️ Got real census data asynchronously:', zipCode, censusData);
+      // Update the ZIP with real data once it arrives
+      addZipToActiveTerritory(zipCode, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current);
+    }).catch(censusError => {
+      console.warn('🖱️ Census API failed asynchronously:', zipCode, censusError.message);
+      // Keep placeholder data (0, 0) - already set above
+    });
 
-      // Always try to add ZIP to territory (let App.jsx decide if it's allowed)
-      console.log('🖱️ Calling addZipToActiveTerritory with:', zipCode, population, standAloneHouses, 'territoryId:', localAddModeTerritoryIdRef.current);
-      addZipToActiveTerritory(zipCode, population, standAloneHouses, localAddModeTerritoryIdRef.current);
-
-      // Show tooltip for successful data retrieval
-      const cachedData = apiCache.get(zipCode);
-      const isEstimated = cachedData?.estimated || false;
+    // Show tooltip in add mode (immediate feedback)
+    if (localAddModeTerritoryIdRef.current) {
       setPopupInfo({
         zip: zipCode,
         lngLat: e.lngLat,
-        population,
-        standAloneHouses,
-        estimated: isEstimated
+        population: 0, // Placeholder initially
+        standAloneHouses: 0,
+        estimated: true // Will be updated when real data arrives
       });
+    }
 
       // Handle highlighting based on mode
       if (!localAddModeTerritoryIdRef.current) {
@@ -1219,8 +1180,9 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     } catch (error) {
       console.error('Failed to add ZIP:', error);
     } finally {
-      // Remove from processing set
+      // Remove from processing set and reset processing state
       processingZipsRef.current.delete(zipCode);
+      setIsProcessingZip(false);
     }
   }, [addZipToActiveTerritory]);
 
