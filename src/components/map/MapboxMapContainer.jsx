@@ -756,9 +756,16 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
   // Handle selected territory tooltip (persistent)
   useEffect(() => {
-    console.log('🔍 Selected territory tooltip useEffect triggered - activeTerritoryId:', activeTerritoryId, 'mapLoaded:', mapLoaded);
+    console.log('🔍 Selected territory tooltip useEffect triggered - activeTerritoryId:', activeTerritoryId, 'mapLoaded:', mapLoaded, 'addMode:', !!localAddModeTerritoryIdRef.current);
     console.log('🔍 Available territories:', territories.map(t => `${t.name} (id: ${t.id})`));
     console.log('🔍 mapRef.current exists:', !!mapRef.current);
+
+    // Don't show territory tooltip in add mode - only show individual ZIP tooltips
+    if (localAddModeTerritoryIdRef.current) {
+      console.log('🔍 Skipping territory tooltip - in add mode');
+      return;
+    }
+
     if (!mapLoaded || !mapRef.current) {
       console.log('🔍 Early return from tooltip useEffect - conditions not met');
       return;
@@ -771,6 +778,9 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       selectedTerritoryPopup.remove();
       setSelectedTerritoryPopup(null);
     }
+
+    // Clear any existing ZIP tooltip when showing territory tooltip
+    setPopupInfo(null);
 
     // Create new popup for selected territory
     if (activeTerritoryId) {
