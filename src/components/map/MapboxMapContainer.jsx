@@ -1167,7 +1167,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         console.log('🖱️ In add mode - showing ZIP tooltip and territories useEffect will handle highlighting');
         const cachedData = apiCache.get(zipCode);
         const isEstimated = cachedData?.estimated || false;
-        console.log('🖱️ Setting popup info for add mode:', { zip: zipCode, population, standAloneHouses, estimated: isEstimated });
+        console.log('🖱️ Setting popup info for add mode:', { zip: zipCode, estimated: isEstimated });
         setPopupInfo({
           zip: zipCode,
           lngLat: e.lngLat,
