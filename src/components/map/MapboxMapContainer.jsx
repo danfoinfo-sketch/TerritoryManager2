@@ -1203,8 +1203,18 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           }
         }
       } else {
-        // In add mode - the territories useEffect will handle highlighting when territories update
-        console.log('🖱️ In add mode - territories useEffect will handle highlighting');
+        // In add mode - show ZIP tooltip anyway, territories useEffect will handle highlighting
+        console.log('🖱️ In add mode - showing ZIP tooltip and territories useEffect will handle highlighting');
+        const cachedData = apiCache.get(zipCode);
+        const isEstimated = cachedData?.estimated || false;
+        console.log('🖱️ Setting popup info for add mode:', { zip: zipCode, population, standAloneHouses, estimated: isEstimated });
+        setPopupInfo({
+          zip: zipCode,
+          lngLat: e.lngLat,
+          population,
+          standAloneHouses,
+          estimated: isEstimated
+        });
       }
 
     } catch (error) {
