@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MapboxMapContainer from './components/map/MapboxMapContainer';
 import Sidebar from './components/Sidebar';
+import { db } from './firebase';
+import { collection, setDoc, getDocs, getDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 const TERRITORY_COLORS = [
   "#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6",
@@ -17,6 +19,9 @@ function App() {
   const [showLoadProfile, setShowLoadProfile] = useState(false);
   const [showSaveProfileModal, setShowSaveProfileModal] = useState(false);
   const [saveProfileName, setSaveProfileName] = useState('');
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
   const handleSetAddModeTerritoryId = (value) => {
     console.log('🚨 App.jsx setAddModeTerritoryId called with:', value, 'previous value:', addModeTerritoryId, 'stack trace:', new Error().stack);
@@ -139,13 +144,17 @@ function App() {
   };
 
   // Profile management functions
-  const loadSavedProfiles = useCallback(() => {
+  const loadSavedProfiles = useCallback(async () => {
+    setLoadingProfiles(true);
     try {
-      const profileNames = JSON.parse(localStorage.getItem('territoryProfileNames') || '[]');
+      const querySnapshot = await getDocs(collection(db, 'profiles'));
+      const profileNames = querySnapshot.docs.map(doc => doc.data().name);
       setSavedProfiles(profileNames);
     } catch (error) {
       console.error('Error loading saved profiles:', error);
       setSavedProfiles([]);
+    } finally {
+      setLoadingProfiles(false);
     }
   }, []);
 
@@ -155,7 +164,7 @@ function App() {
     setShowSaveProfileModal(true);
   }, []);
 
-  const saveProfile = useCallback(() => {
+  const saveProfile = useCallback(async () => {
     console.log('saveProfile function called with name:', saveProfileName);
     const trimmedName = saveProfileName.trim();
 
@@ -164,62 +173,85 @@ function App() {
       return;
     }
 
-    // Check for duplicate names
-    const existingProfiles = JSON.parse(localStorage.getItem('territoryProfileNames') || '[]');
-    if (existingProfiles.includes(trimmedName)) {
-      if (!window.confirm(`Profile "${trimmedName}" already exists. Overwrite it?`)) {
-        return;
-      }
-    }
+    setSavingProfile(true);
 
     try {
-      console.log('Saving territories:', territories);
-      // Save the territories
-      localStorage.setItem(`territoryProfile_${trimmedName}`, JSON.stringify(territories));
+      // Create document ID from profile name (lowercase, replace spaces with hyphens)
+      const docId = trimmedName.toLowerCase().replace(/\s+/g, '-');
 
-      // Update the profile names list
-      const updatedProfiles = existingProfiles.filter(name => name !== trimmedName);
-      updatedProfiles.push(trimmedName);
-      localStorage.setItem('territoryProfileNames', JSON.stringify(updatedProfiles));
+      // Check if profile already exists
+      const profileRef = doc(db, 'profiles', docId);
+      const profileSnap = await getDoc(profileRef);
 
-      // Update local state
-      setSavedProfiles(updatedProfiles);
+      if (profileSnap.exists()) {
+        if (!window.confirm(`Profile "${trimmedName}" already exists. Overwrite it?`)) {
+          setSavingProfile(false);
+          return;
+        }
+      }
+
+      console.log('Saving territories to Firestore:', territories);
+
+      // Save profile to Firestore
+      await setDoc(profileRef, {
+        name: trimmedName,
+        territories: territories,
+        createdAt: serverTimestamp()
+      });
+
+      // Reload profiles list to get updated data
+      await loadSavedProfiles();
 
       console.log(`Profile "${trimmedName}" saved successfully!`);
+      alert(`Profile saved: ${trimmedName}`);
       setShowSaveProfileModal(false);
+      setSaveProfileName('');
     } catch (error) {
       console.error('Error saving profile:', error);
-      console.log('Error saving profile. Please try again.');
+      alert('Error saving profile. Please try again.');
+    } finally {
+      setSavingProfile(false);
     }
   }, [territories, saveProfileName]);
 
-  const loadProfile = useCallback((profileName) => {
+  const loadProfile = useCallback(async (profileName) => {
     if (!profileName) return;
 
+    setLoadingProfile(true);
+
     try {
-      const savedTerritories = JSON.parse(localStorage.getItem(`territoryProfile_${profileName}`));
-      if (!savedTerritories) {
+      // Convert profile name to document ID format
+      const docId = profileName.toLowerCase().replace(/\s+/g, '-');
+      const profileRef = doc(db, 'profiles', docId);
+      const profileSnap = await getDoc(profileRef);
+
+      if (!profileSnap.exists()) {
         alert(`Profile "${profileName}" not found.`);
         return;
       }
 
+      const profileData = profileSnap.data();
+
       // Warn if there are current territories
       if (territories.length > 0) {
         if (!confirm(`This will replace your current ${territories.length} territories with the saved profile. Continue?`)) {
+          setLoadingProfile(false);
           return;
         }
       }
 
       // Load the territories
-      setTerritories(savedTerritories);
+      setTerritories(profileData.territories);
       setActiveTerritoryId(null);
       setAddModeTerritoryId(null);
 
       setShowLoadProfile(false);
-      alert(`Profile "${profileName}" loaded successfully!`);
+      alert(`Loaded: ${profileName}`);
     } catch (error) {
       console.error('Error loading profile:', error);
       alert('Error loading profile. Please try again.');
+    } finally {
+      setLoadingProfile(false);
     }
   }, [territories.length]);
 
@@ -257,6 +289,9 @@ function App() {
         onLoadProfile={loadProfile}
         showLoadProfile={showLoadProfile}
         setShowLoadProfile={setShowLoadProfile}
+        loadingProfiles={loadingProfiles}
+        savingProfile={savingProfile}
+        loadingProfile={loadingProfile}
       />
       <div className="map-wrapper" style={{ flex: 1, height: '100%', position: 'relative' }}>
         <MapboxMapContainer
@@ -336,17 +371,17 @@ function App() {
               </button>
               <button
                 onClick={saveProfile}
-                disabled={!saveProfileName.trim()}
+                disabled={!saveProfileName.trim() || savingProfile}
                 style={{
                   padding: '8px 16px',
-                  background: saveProfileName.trim() ? '#3b82f6' : '#9ca3af',
+                  background: (!saveProfileName.trim() || savingProfile) ? '#9ca3af' : '#3b82f6',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: saveProfileName.trim() ? 'pointer' : 'not-allowed',
+                  cursor: (!saveProfileName.trim() || savingProfile) ? 'not-allowed' : 'pointer',
                 }}
               >
-                Save Profile
+                {savingProfile ? 'Saving...' : 'Save Profile'}
               </button>
             </div>
           </div>

@@ -17,6 +17,9 @@ export default function Sidebar({
   onLoadProfile,
   showLoadProfile,
   setShowLoadProfile,
+  loadingProfiles,
+  savingProfile,
+  loadingProfile,
 }) {
   console.log('Sidebar received profile props:', { savedProfiles, onSaveProfile, showLoadProfile });
   // Debug: log territories received by sidebar
@@ -64,66 +67,76 @@ export default function Sidebar({
               console.log('Save Profile As clicked');
               onSaveProfile();
             }}
+            disabled={savingProfile || loadingProfiles}
             style={{
               flex: 1,
               padding: '8px 12px',
-              background: '#3b82f6',
+              background: savingProfile || loadingProfiles ? '#9ca3af' : '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
               fontSize: '0.85rem',
               fontWeight: '500',
-              cursor: 'pointer',
+              cursor: savingProfile || loadingProfiles ? 'not-allowed' : 'pointer',
               zIndex: 1001,
             }}
           >
-            Save Profile As…
+            {savingProfile ? 'Saving...' : 'Save Profile As…'}
           </button>
 
           <button
             type="button"
             onClick={() => setShowLoadProfile(!showLoadProfile)}
+            disabled={loadingProfiles || loadingProfile}
             style={{
               flex: 1,
               padding: '8px 12px',
-              background: '#6b7280',
+              background: loadingProfiles || loadingProfile ? '#9ca3af' : '#6b7280',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
               fontSize: '0.85rem',
               fontWeight: '500',
-              cursor: 'pointer',
+              cursor: loadingProfiles || loadingProfile ? 'not-allowed' : 'pointer',
               zIndex: 1001,
             }}
           >
-            Load Profile
+            {loadingProfiles ? 'Loading...' : 'Load Profile'}
           </button>
         </div>
 
         {showLoadProfile && (
           <div style={{ marginTop: '8px' }}>
-            {savedProfiles.length === 0 ? (
+            {loadingProfiles ? (
+              <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0 }}>
+                Loading profiles...
+              </p>
+            ) : savedProfiles.length === 0 ? (
               <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0 }}>
                 No saved profiles yet
               </p>
             ) : (
               <select
                 onChange={(e) => {
-                  if (e.target.value) {
+                  if (e.target.value && !loadingProfile) {
                     onLoadProfile(e.target.value);
                     e.target.value = '';
                   }
                 }}
+                disabled={loadingProfile}
                 style={{
                   width: '100%',
                   padding: '6px 8px',
                   borderRadius: '4px',
                   border: '1px solid #d1d5db',
-                  background: 'white',
+                  background: loadingProfile ? '#f9fafb' : 'white',
                   fontSize: '0.8rem',
+                  cursor: loadingProfile ? 'not-allowed' : 'default',
                 }}
               >
-                <option value="">Choose a profile...</option>
+                <option value="">
+                  {loadingProfile ? 'Loading profile...' : 'Choose a profile...'}
+                </option>
                 {savedProfiles.map(profileName => (
                   <option key={profileName} value={profileName}>
                     {profileName}
