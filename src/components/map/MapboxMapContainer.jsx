@@ -44,6 +44,7 @@ export default forwardRef(function MapboxMapContainer({
   const [loadingZips, setLoadingZips] = useState(false);
   const [popupInfo, setPopupInfo] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
   const [territoryTooltip, setTerritoryTooltip] = useState(null); // For hover tooltips
   const [selectedTerritoryPopup, setSelectedTerritoryPopup] = useState(null); // For selected territory persistent tooltip
 
@@ -2502,23 +2503,36 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
   console.log('🗺️ MapboxMapContainer rendering, mapLoaded:', mapLoaded);
 
-  // Debug container dimensions (only once, not continuously)
+  // Check container dimensions and set containerReady
   useEffect(() => {
     const checkDimensions = () => {
       const container = document.querySelector('.map-container');
       if (container) {
         const rect = container.getBoundingClientRect();
-        console.log('🗺️ Map container dimensions:', rect.width, 'x', rect.height, 'visible:', rect.width > 0 && rect.height > 0);
+        const hasDimensions = rect.width > 0 && rect.height > 0;
+        console.log('🗺️ Map container dimensions:', rect.width, 'x', rect.height, 'has dimensions:', hasDimensions);
+
+        if (hasDimensions && !containerReady) {
+          setContainerReady(true);
+          console.log('🗺️ Container ready, map can now initialize');
+        }
       } else {
         console.log('🗺️ Map container not found');
       }
     };
 
-    // Only check once after a delay to let DOM settle
-    const timeout = setTimeout(checkDimensions, 1000);
+    // Check immediately
+    checkDimensions();
 
-    return () => clearTimeout(timeout);
-  }, []); // Empty dependency array - only run once
+    // Also check after a short delay to catch any layout changes
+    const timeout = setTimeout(checkDimensions, 100);
+    const timeout2 = setTimeout(checkDimensions, 500);
+
+    return () => {
+      clearTimeout(timeout);
+      clearTimeout(timeout2);
+    };
+  }, [containerReady]);
 
   const hasValidToken = MAPBOX_ACCESS_TOKEN && MAPBOX_ACCESS_TOKEN !== 'your-mapbox-token-here' && MAPBOX_ACCESS_TOKEN.length > 10;
 
@@ -2555,10 +2569,12 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     <div
       className="map-container"
       style={{
-        height: '100%',
-        width: '100%',
+        height: '100vh',
+        width: '100vw',
         position: 'relative',
-        backgroundColor: mapLoaded ? 'transparent' : '#f5f5dc' // Tan background while loading
+        backgroundColor: mapLoaded ? 'transparent' : '#f5f5dc', // Tan background while loading
+        minHeight: '400px',
+        minWidth: '400px'
       }}
     >
       {!mapLoaded && (
@@ -2574,14 +2590,16 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           Loading map...
         </div>
       )}
-      <Map
+
+      {containerReady && (
+        <Map
         ref={mapRef}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
         initialViewState={viewport}
         onMove={handleViewportChange}
         style={{
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100vh',
           minHeight: '400px',
           minWidth: '400px'
         }}
@@ -2627,7 +2645,8 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         <NavigationControl position="top-right" />
 
         {/* States layer removed temporarily - causing 404 */}
-      </Map>
+        </Map>
+      )}
 
       {/* Loading indicator */}
       {loadingZips && (
