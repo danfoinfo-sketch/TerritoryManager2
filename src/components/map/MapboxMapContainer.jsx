@@ -1192,12 +1192,14 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         }
 
         // Show tooltip
+        const cachedData = apiCache.get(zipCode);
+        const isEstimated = cachedData?.estimated || false;
         setPopupInfo({
           zip: zipCode,
           lngLat: e.lngLat,
           population,
           standAloneHouses,
-          estimated: population > 0 && standAloneHouses > 0 // Flag when using estimated data
+          estimated: isEstimated
         });
       } else {
         // In add mode - the territories useEffect will handle highlighting when territories update

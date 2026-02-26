@@ -134,7 +134,8 @@ export const fetchZipPopulationAndHouses = async (zip) => {
     };
 
     console.log(`Using estimated data for ZIP ${zip}:`, estimatedData);
-    // Cache estimated data too to avoid repeated API failures
+    // Mark as estimated data and cache it
+    estimatedData.estimated = true;
     apiCache.set(zip, estimatedData);
     return estimatedData;
   }
