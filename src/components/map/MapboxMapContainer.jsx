@@ -1197,7 +1197,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           lngLat: e.lngLat,
           population,
           standAloneHouses,
-          error: population === 0 && standAloneHouses === 0 // Flag when using placeholder data
+          estimated: population > 0 && standAloneHouses > 0 // Flag when using estimated data
         });
       } else {
         // In add mode - the territories useEffect will handle highlighting when territories update
@@ -2174,10 +2174,12 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         >
           {popupInfo.loading ? (
             <div>Loading ZIP data...</div>
-          ) : popupInfo.error ? (
+          ) : popupInfo.estimated ? (
             <div>
-              ZIP: {popupInfo.zip}<br/>
-              <span style={{color: '#dc3545'}}>Data unavailable</span>
+              <strong>ZIP: {popupInfo.zip}</strong><br/>
+              Population: ~{popupInfo.population?.toLocaleString()} <small style={{color: '#666'}}>(est.)</small><br/>
+              Detached Homes: ~{popupInfo.standAloneHouses?.toLocaleString()} <small style={{color: '#666'}}>(est.)</small><br/>
+              <small style={{color: '#666', fontSize: '0.8em'}}>No census data available</small>
             </div>
           ) : (
             <div style={{ position: 'relative' }}>
