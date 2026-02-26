@@ -1076,7 +1076,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       addZipToActiveTerritory(zipCode, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current);
 
       // Update tooltip if it's currently showing this ZIP
-      if (popupInfo && popupInfo.zip === zipCode && popupInfo.estimated) {
+      if (popupInfo && popupInfo.zip === zipCode) {
         console.log('🖱️ Updating tooltip with real census data:', censusData);
         setPopupInfo({
           ...popupInfo,
@@ -1087,7 +1087,16 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       }
     }).catch(censusError => {
       console.warn('🖱️ Census API failed asynchronously:', zipCode, censusError.message);
-      // Keep placeholder data (0, 0) - already set above
+      // Update tooltip to show data unavailable if it's currently showing this ZIP
+      if (popupInfo && popupInfo.zip === zipCode) {
+        console.log('🖱️ Updating tooltip to show data unavailable');
+        setPopupInfo({
+          ...popupInfo,
+          population: 0,
+          standAloneHouses: 0,
+          estimated: true
+        });
+      }
     });
 
     // Show tooltip in add mode (immediate feedback)
@@ -1114,23 +1123,14 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         }
         setSelectedZips([zipCode]);
 
-        // Show tooltip for the selected ZIP
-        const cachedData = apiCache.get(zipCode);
-        const hasRealData = cachedData && !cachedData.estimated;
-        console.log('🖱️ Setting popup info for single ZIP:', {
-          zip: zipCode,
-          hasCachedData: !!cachedData,
-          hasRealData,
-          population: cachedData?.population,
-          estimated: cachedData?.estimated
-        });
-
+        // Show tooltip for the selected ZIP (will be updated when real data arrives)
+        console.log('🖱️ Setting initial tooltip for ZIP:', zipCode);
         setPopupInfo({
           zip: zipCode,
           lngLat: e.lngLat,
-          population: hasRealData ? cachedData.population : 0,
-          standAloneHouses: hasRealData ? cachedData.standAloneHouses : 0,
-          estimated: !hasRealData // Show as estimated if we don't have real data yet
+          population: 0, // Placeholder until real data arrives
+          standAloneHouses: 0,
+          estimated: true // Initially estimated until real data arrives
         });
 
         // Update the highlight layer filter immediately (type-safe)
