@@ -12,7 +12,7 @@
  * 9. Restart the dev server
  */
 
-import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useMemo, useLayoutEffect } from 'react';
 import Map, { Source, Layer, NavigationControl } from 'react-map-gl';
 import mapboxgl from 'mapbox-gl';
 import { Loader2 } from "lucide-react";
@@ -44,7 +44,6 @@ export default forwardRef(function MapboxMapContainer({
   const [loadingZips, setLoadingZips] = useState(false);
   const [popupInfo, setPopupInfo] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [containerReady, setContainerReady] = useState(false);
   const [territoryTooltip, setTerritoryTooltip] = useState(null); // For hover tooltips
   const [selectedTerritoryPopup, setSelectedTerritoryPopup] = useState(null); // For selected territory persistent tooltip
 
@@ -1151,19 +1150,32 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
   }, [mapLoaded]);
 
   // Force resize on component mount to handle initial sizing issues
-  useEffect(() => {
+  useLayoutEffect(() => {
+    console.log('🗺️ useLayoutEffect: Forcing initial container sizing');
+
+    // Force the container to recalculate its dimensions
+    const container = document.querySelector('.map-container');
+    if (container) {
+      // Force a reflow by accessing offsetHeight
+      container.offsetHeight;
+      console.log('🗺️ Container reflow forced');
+    }
+
     const forceInitialResize = () => {
       if (mapRef.current) {
         const map = mapRef.current.getMap();
         if (map) {
-          console.log('Map resized on component mount');
+          console.log('Map resized in useLayoutEffect');
           map.resize();
         }
       }
     };
 
-    // Try multiple times in case map isn't ready yet
+    // Try multiple times with increasing delays
+    setTimeout(forceInitialResize, 0);
+    setTimeout(forceInitialResize, 50);
     setTimeout(forceInitialResize, 100);
+    setTimeout(forceInitialResize, 250);
     setTimeout(forceInitialResize, 500);
     setTimeout(forceInitialResize, 1000);
   }, []);
@@ -2503,46 +2515,6 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
   console.log('🗺️ MapboxMapContainer rendering, mapLoaded:', mapLoaded);
 
-  // Check container dimensions and set containerReady
-  useEffect(() => {
-    const checkDimensions = () => {
-      const container = document.querySelector('.map-container');
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        const hasDimensions = rect.width > 10 && rect.height > 10; // Use > 10 to be safe
-        console.log('🗺️ Map container dimensions:', rect.width, 'x', rect.height, 'has dimensions:', hasDimensions);
-
-        if (hasDimensions && !containerReady) {
-          setContainerReady(true);
-          console.log('🗺️ Container ready, map can now initialize');
-        }
-      } else {
-        console.log('🗺️ Map container not found');
-      }
-    };
-
-    // Use requestAnimationFrame for more reliable timing
-    const checkWithRAF = () => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(checkDimensions); // Double RAF for after paint
-      });
-    };
-
-    // Check after layout has settled
-    setTimeout(checkWithRAF, 50);
-    setTimeout(checkWithRAF, 150);
-    setTimeout(checkWithRAF, 300);
-    setTimeout(checkWithRAF, 600);
-
-    // Fallback: force ready after 2 seconds
-    setTimeout(() => {
-      if (!containerReady) {
-        console.log('🗺️ Fallback: forcing container ready after timeout');
-        setContainerReady(true);
-      }
-    }, 2000);
-
-  }, [containerReady]);
 
   const hasValidToken = MAPBOX_ACCESS_TOKEN && MAPBOX_ACCESS_TOKEN !== 'your-mapbox-token-here' && MAPBOX_ACCESS_TOKEN.length > 10;
 
@@ -2602,9 +2574,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         </div>
       )}
 
-      {containerReady && (
-        <Map
-        key="map-component" // Force remount when container becomes ready
+      <Map
         ref={mapRef}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
         initialViewState={viewport}
@@ -2652,13 +2622,21 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
           console.error('🗺️ Map tile error:', e);
           setMapLoaded(false);
         }}
+        onRender={() => {
+          // Force resize on every render to ensure proper sizing
+          if (mapRef.current) {
+            const map = mapRef.current.getMap();
+            if (map) {
+              map.resize();
+            }
+          }
+        }}
         interactiveLayerIds={['zip-fills-new']}
       >
         <NavigationControl position="top-right" />
 
         {/* States layer removed temporarily - causing 404 */}
-        </Map>
-      )}
+      </Map>
 
       {/* Loading indicator */}
       {loadingZips && (
