@@ -45,6 +45,18 @@ export const fetchZipPopulationAndHouses = async (zip) => {
 
   try {
     console.log(`Fetching census data for ZIP: ${zip}`);
+
+    // Test with a known working ZIP code first to check API status
+    if (zip === '67831') {
+      console.log('Testing with known working ZIP 10001 instead...');
+      const testResponse = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:10001&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+      if (testResponse.ok) {
+        console.log('API key works with test ZIP 10001');
+      } else {
+        console.log('API key failed even with test ZIP 10001:', testResponse.status);
+      }
+    }
+
     const response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
 
     if (!response.ok) {
