@@ -1293,7 +1293,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
     // Call the async function
     setupTooltip();
-  }, [activeTerritoryId, territories, mapLoaded, getTerritoryGeometry]);
+  }, [activeTerritoryId, territories, mapLoaded]);
 
 
   // Fallback: Force map to be considered loaded after 10 seconds
