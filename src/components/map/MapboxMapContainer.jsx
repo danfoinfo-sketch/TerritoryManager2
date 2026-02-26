@@ -1289,6 +1289,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
         console.error('❌ mapboxgl available:', typeof mapboxgl);
         console.error('❌ mapboxgl.Popup available:', typeof mapboxgl?.Popup);
       }
+    }
     })();
   }, [activeTerritoryId, territories, mapLoaded]);
 
