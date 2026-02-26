@@ -2237,8 +2237,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
               </div>
             </div>
             );
-          })()
-          )}
+          })()}
         </div>
       )}
 
