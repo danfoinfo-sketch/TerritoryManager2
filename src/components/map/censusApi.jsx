@@ -1,5 +1,5 @@
 // src/components/map/censusApi.jsx
-const CENSUS_API_KEY = import.meta.env.VITE_CENSUS_API_KEY; // Add to .env if needed
+const CENSUS_API_KEY = import.meta.env.VITE_CENSUS_API_KEY || '0a85b2c9a4ae36ec7479013358c9002da2149c34'; // Fallback to hardcoded key
 
 // Cache for API results to avoid duplicate calls
 const apiCache = new Map();
@@ -45,7 +45,8 @@ export const fetchZipPopulationAndHouses = async (zip) => {
 
   try {
     console.log(`Fetching census data for ZIP: ${zip}`);
-    const response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+    // Use the most reliable Census API endpoint for ZIP codes
+    const response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zip%20code%20tabulation%20area:${zip}&key=${CENSUS_API_KEY}`);
 
     if (!response.ok) {
       console.warn(`API returned ${response.status} for ZIP ${zip}`);
