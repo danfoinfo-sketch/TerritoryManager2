@@ -2509,7 +2509,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       const container = document.querySelector('.map-container');
       if (container) {
         const rect = container.getBoundingClientRect();
-        const hasDimensions = rect.width > 0 && rect.height > 0;
+        const hasDimensions = rect.width > 10 && rect.height > 10; // Use > 10 to be safe
         console.log('🗺️ Map container dimensions:', rect.width, 'x', rect.height, 'has dimensions:', hasDimensions);
 
         if (hasDimensions && !containerReady) {
@@ -2521,17 +2521,27 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       }
     };
 
-    // Check immediately
-    checkDimensions();
-
-    // Also check after a short delay to catch any layout changes
-    const timeout = setTimeout(checkDimensions, 100);
-    const timeout2 = setTimeout(checkDimensions, 500);
-
-    return () => {
-      clearTimeout(timeout);
-      clearTimeout(timeout2);
+    // Use requestAnimationFrame for more reliable timing
+    const checkWithRAF = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(checkDimensions); // Double RAF for after paint
+      });
     };
+
+    // Check after layout has settled
+    setTimeout(checkWithRAF, 50);
+    setTimeout(checkWithRAF, 150);
+    setTimeout(checkWithRAF, 300);
+    setTimeout(checkWithRAF, 600);
+
+    // Fallback: force ready after 2 seconds
+    setTimeout(() => {
+      if (!containerReady) {
+        console.log('🗺️ Fallback: forcing container ready after timeout');
+        setContainerReady(true);
+      }
+    }, 2000);
+
   }, [containerReady]);
 
   const hasValidToken = MAPBOX_ACCESS_TOKEN && MAPBOX_ACCESS_TOKEN !== 'your-mapbox-token-here' && MAPBOX_ACCESS_TOKEN.length > 10;
@@ -2569,12 +2579,13 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
     <div
       className="map-container"
       style={{
-        height: '100vh',
-        width: '100vw',
+        height: 'calc(100vh - 0px)', // Force calculation
+        width: 'calc(100vw - 0px)',  // Force calculation
         position: 'relative',
         backgroundColor: mapLoaded ? 'transparent' : '#f5f5dc', // Tan background while loading
         minHeight: '400px',
-        minWidth: '400px'
+        minWidth: '400px',
+        display: 'block' // Ensure it's not display: none
       }}
     >
       {!mapLoaded && (
@@ -2593,13 +2604,14 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
 
       {containerReady && (
         <Map
+        key="map-component" // Force remount when container becomes ready
         ref={mapRef}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
         initialViewState={viewport}
         onMove={handleViewportChange}
         style={{
-          width: '100vw',
-          height: '100vh',
+          width: 'calc(100vw - 0px)',
+          height: 'calc(100vh - 0px)',
           minHeight: '400px',
           minWidth: '400px'
         }}
