@@ -40,9 +40,7 @@ export const fetchZipPopulationAndHouses = async (zip) => {
   // Basic validation - allow ZIP codes that start with 0
   if (!zip || zip.length !== 5 || isNaN(zip)) {
     console.log(`Skipping API for invalid ZIP: ${zip}`);
-    const dummyData = { population: Math.floor(Math.random() * 10000) + 1000, standAloneHouses: Math.floor(Math.random() * 2000) + 500 };
-    apiCache.set(zip, dummyData);
-    return dummyData;
+    throw new Error(`Invalid ZIP code format: ${zip}`);
   }
 
   try {
@@ -72,15 +70,7 @@ export const fetchZipPopulationAndHouses = async (zip) => {
     return result;
 
   } catch (error) {
-    console.warn(`API failed for ZIP ${zip}, using dummy data:`, error.message);
-    // Return dummy data with realistic values
-    const dummyData = {
-      population: Math.floor(Math.random() * 20000) + 5000,
-      standAloneHouses: Math.floor(Math.random() * 5000) + 1000
-    };
-
-    // Cache dummy data too to avoid repeated API failures
-    apiCache.set(zip, dummyData);
-    return dummyData;
+    console.error(`Census API failed for ZIP ${zip}:`, error.message);
+    throw new Error(`Failed to fetch census data for ZIP ${zip}: ${error.message}`);
   }
 };
