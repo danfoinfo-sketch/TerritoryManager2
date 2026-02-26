@@ -1120,6 +1120,7 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       // Show tooltip for successful data retrieval
       const cachedData = apiCache.get(zipCode);
       const isEstimated = cachedData?.estimated || false;
+      console.log('🖱️ Setting popup info:', { zip: zipCode, population, standAloneHouses, estimated: isEstimated });
       setPopupInfo({
         zip: zipCode,
         lngLat: e.lngLat,
@@ -2136,7 +2137,10 @@ const ZIP_PROPERTY = 'ZCTA5CE20';
       )}
 
       {/* ZIP info popup - positioned near click location */}
-      {popupInfo && popupInfo.lngLat && mapRef.current && (
+      {popupInfo && popupInfo.lngLat && mapRef.current && (() => {
+        console.log('🎯 Rendering tooltip for:', popupInfo);
+        return true;
+      })() && (
         <div
           className="zip-tooltip"
           style={{
