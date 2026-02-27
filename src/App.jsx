@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MapboxMapContainer from './components/map/MapboxMapContainer';
 import Sidebar from './components/Sidebar';
-import { db } from './firebase';
-import { collection, setDoc, getDocs, getDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useMapSearch } from './hooks/useMapSearch';
+import { useProfiles } from './hooks/useProfiles';
 
 // Add CSS animation for loading spinner
 const spinnerStyle = `
@@ -30,14 +29,22 @@ function App() {
   const [activeTerritoryId, setActiveTerritoryId] = useState(null);
   const [addModeTerritoryId, setAddModeTerritoryId] = useState(null);
 
-  // Profile management state
-  const [savedProfiles, setSavedProfiles] = useState([]);
-  const [showLoadProfile, setShowLoadProfile] = useState(false);
-  const [showSaveProfileModal, setShowSaveProfileModal] = useState(false);
-  const [saveProfileName, setSaveProfileName] = useState('');
-  const [loadingProfiles, setLoadingProfiles] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(false);
+  // Profile management (extracted to hook)
+  const {
+    savedProfiles,
+    showLoadProfile,
+    showSaveProfileModal,
+    saveProfileName,
+    loadingProfiles,
+    savingProfile,
+    loadingProfile,
+    saveProfile: saveProfileToFirestore,
+    loadProfile: loadProfileFromFirestore,
+    openSaveProfileModal,
+    setShowLoadProfile,
+    setShowSaveProfileModal,
+    setSaveProfileName
+  } = useProfiles(territories);
 
   // Search functionality (extracted to hook)
   const { searchQuery, searchLoading, handleSearch, setSearchQuery } = useMapSearch(mapContainerRef);
@@ -162,122 +169,20 @@ function App() {
     setTerritories(territories.map(t => t.id === id ? { ...t, visible: !t.visible } : t));
   };
 
-  // Profile management functions
-  const loadSavedProfiles = useCallback(async () => {
-    setLoadingProfiles(true);
-    try {
-      const querySnapshot = await getDocs(collection(db, 'profiles'));
-      const profileNames = querySnapshot.docs.map(doc => doc.data().name);
-      setSavedProfiles(profileNames);
-    } catch (error) {
-      console.error('Error loading saved profiles:', error);
-      setSavedProfiles([]);
-    } finally {
-      setLoadingProfiles(false);
-    }
-  }, []);
-
-  const openSaveProfileModal = useCallback(() => {
-    console.log('Opening save profile modal');
-    setSaveProfileName('');
-    setShowSaveProfileModal(true);
-  }, []);
-
+  // Profile management functions (wrapped to work with hook)
   const saveProfile = useCallback(async () => {
-    console.log('saveProfile function called with name:', saveProfileName);
-    const trimmedName = saveProfileName.trim();
-
-    if (!trimmedName) {
-      console.log('No profile name entered, returning');
-      return;
-    }
-
-    setSavingProfile(true);
-
-    try {
-      // Create document ID from profile name (lowercase, replace spaces with hyphens)
-      const docId = trimmedName.toLowerCase().replace(/\s+/g, '-');
-
-      // Check if profile already exists
-      const profileRef = doc(db, 'profiles', docId);
-      const profileSnap = await getDoc(profileRef);
-
-      if (profileSnap.exists()) {
-        if (!window.confirm(`Profile "${trimmedName}" already exists. Overwrite it?`)) {
-          setSavingProfile(false);
-          return;
-        }
-      }
-
-      console.log('Saving territories to Firestore:', territories);
-
-      // Save profile to Firestore
-      await setDoc(profileRef, {
-        name: trimmedName,
-        territories: territories,
-        createdAt: serverTimestamp()
-      });
-
-      // Reload profiles list to get updated data
-      await loadSavedProfiles();
-
-      console.log(`Profile "${trimmedName}" saved successfully!`);
-      alert(`Profile saved: ${trimmedName}`);
-      setShowSaveProfileModal(false);
-      setSaveProfileName('');
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      alert('Error saving profile. Please try again.');
-    } finally {
-      setSavingProfile(false);
-    }
-  }, [territories, saveProfileName]);
+    await saveProfileToFirestore();
+  }, [saveProfileToFirestore]);
 
   const loadProfile = useCallback(async (profileName) => {
-    if (!profileName) return;
-
-    setLoadingProfile(true);
-
-    try {
-      // Convert profile name to document ID format
-      const docId = profileName.toLowerCase().replace(/\s+/g, '-');
-      const profileRef = doc(db, 'profiles', docId);
-      const profileSnap = await getDoc(profileRef);
-
-      if (!profileSnap.exists()) {
-        alert(`Profile "${profileName}" not found.`);
-        return;
-      }
-
-      const profileData = profileSnap.data();
-
-      // Warn if there are current territories
-      if (territories.length > 0) {
-        if (!confirm(`This will replace your current ${territories.length} territories with the saved profile. Continue?`)) {
-          setLoadingProfile(false);
-          return;
-        }
-      }
-
-      // Load the territories
-      setTerritories(profileData.territories);
+    const loadedTerritories = await loadProfileFromFirestore(profileName, territories);
+    if (loadedTerritories) {
+      setTerritories(loadedTerritories);
       setActiveTerritoryId(null);
       setAddModeTerritoryId(null);
-
       setShowLoadProfile(false);
-      alert(`Loaded: ${profileName}`);
-    } catch (error) {
-      console.error('Error loading profile:', error);
-      alert('Error loading profile. Please try again.');
-    } finally {
-      setLoadingProfile(false);
     }
-  }, [territories.length]);
-
-  // Load saved profiles on component mount
-  useEffect(() => {
-    loadSavedProfiles();
-  }, [loadSavedProfiles]);
+  }, [loadProfileFromFirestore, territories]);
 
   useEffect(() => {
     console.log('Sidebar element exists?', document.querySelector('.sidebar'));
