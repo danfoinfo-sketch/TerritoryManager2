@@ -3,6 +3,7 @@ import MapboxMapContainer from './components/map/MapboxMapContainer';
 import Sidebar from './components/Sidebar';
 import { db } from './firebase';
 import { collection, setDoc, getDocs, getDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { useMapSearch } from './hooks/useMapSearch';
 
 // Add CSS animation for loading spinner
 const spinnerStyle = `
@@ -38,33 +39,8 @@ function App() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Search functionality state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchLoading, setSearchLoading] = useState(false);
-
-  // Search handler
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim() || searchLoading) return;
-
-    setSearchLoading(true);
-    try {
-      if (mapContainerRef.current) {
-        const result = await mapContainerRef.current.geocodeAndZoom(searchQuery.trim());
-        if (!result) {
-          alert(`No location found for "${searchQuery}". Try a different search term.`);
-        } else {
-          console.log('Search completed successfully:', result.placeName);
-          // Clear input after successful search
-          setSearchQuery('');
-        }
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      alert('Search failed. Please try again.');
-    } finally {
-      setSearchLoading(false);
-    }
-  }, [searchQuery, searchLoading]);
+  // Search functionality (extracted to hook)
+  const { searchQuery, searchLoading, handleSearch, setSearchQuery } = useMapSearch(mapContainerRef);
 
   const handleSetAddModeTerritoryId = (value) => {
     console.log('🚨 App.jsx setAddModeTerritoryId called with:', value, 'previous value:', addModeTerritoryId, 'stack trace:', new Error().stack);
