@@ -3,6 +3,7 @@ import MapboxMapContainer from './components/map/MapboxMapContainer';
 import Sidebar from './components/Sidebar';
 import { useMapSearch } from './hooks/useMapSearch';
 import { useProfiles } from './hooks/useProfiles';
+import { useTerritories } from './hooks/useTerritories';
 
 // Add CSS animation for loading spinner
 const spinnerStyle = `
@@ -19,15 +20,24 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(style);
 }
 
-const TERRITORY_COLORS = [
-  "#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6",
-  "#06b6d4", "#f43f5e", "#22c55e", "#3b82f6", "#a855f7",
-];
-
 function App() {
-  const [territories, setTerritories] = useState([]);
-  const [activeTerritoryId, setActiveTerritoryId] = useState(null);
-  const [addModeTerritoryId, setAddModeTerritoryId] = useState(null);
+  // Territory management (extracted to hook)
+  const {
+    territories,
+    activeTerritoryId,
+    addModeTerritoryId,
+    createNewTerritory,
+    handleUpdateTerritory,
+    handleDeleteTerritory,
+    handleSelectTerritory,
+    handleSetAddModeTerritoryId,
+    handleToggleTerritoryVisibility,
+    addZipToActiveTerritory,
+    getTerritoryStats,
+    setTerritories,
+    setActiveTerritoryId,
+    setAddModeTerritoryId
+  } = useTerritories(mapContainerRef);
 
   // Profile management (extracted to hook)
   const {
@@ -49,125 +59,11 @@ function App() {
   // Search functionality (extracted to hook)
   const { searchQuery, searchLoading, handleSearch, setSearchQuery } = useMapSearch(mapContainerRef);
 
-  const handleSetAddModeTerritoryId = (value) => {
-    console.log('🚨 App.jsx setAddModeTerritoryId called with:', value, 'previous value:', addModeTerritoryId, 'stack trace:', new Error().stack);
-    setAddModeTerritoryId(value);
-  };
-
-  // Debug: log when addModeTerritoryId changes
-  useEffect(() => {
-    console.log('📢 App.jsx addModeTerritoryId changed to:', addModeTerritoryId, 'stack trace:', new Error().stack);
-  }, [addModeTerritoryId]);
-
-  // Debug: log when territories change
-  useEffect(() => {
-    console.log('🏛️ App.jsx territories changed to:', territories.map(t => ({ id: t.id, name: t.name, zips: t.zips.map(z => z.zip) })));
-  }, [territories]);
 
   const [showBoundaries, setShowBoundaries] = useState(true);
   const [pendingZoomId, setPendingZoomId] = useState(null);
   const mapContainerRef = useRef(null);
 
-  const createNewTerritory = () => {
-    console.log('Creating new territory. Current territories:', territories.map(t => ({ id: t.id, name: t.name })));
-    const name = `Territory ${territories.length + 1}`;
-    const territoryId = Date.now().toString();
-    console.log('Creating new territory with ID:', territoryId, 'name:', name);
-    const newTerritory = {
-      id: territoryId,
-      name,
-      color: TERRITORY_COLORS[territories.length % TERRITORY_COLORS.length],
-      zips: [],
-    };
-    const newTerritories = [...territories, newTerritory];
-    console.log('New territories array:', newTerritories.map(t => ({ id: t.id, name: t.name, zips: t.zips.length })));
-    setTerritories(newTerritories);
-    setActiveTerritoryId(newTerritory.id);
-    console.log('Set active territory to:', newTerritory.id);
-    // Don't auto-enter add mode - user must click "Add ZIPs"
-  };
-
-  const handleDeleteTerritory = (id) => {
-    setTerritories(territories.filter(t => t.id !== id));
-    if (activeTerritoryId === id) setActiveTerritoryId(null);
-    if (addModeTerritoryId === id) setAddModeTerritoryId(null);
-  };
-
-  const addZipToActiveTerritory = useCallback((zip, population, homes, territoryId = null, updateExisting = false) => {
-    const targetTerritoryId = territoryId || addModeTerritoryId;
-    console.log('🛠️ addZipToActiveTerritory function called with', zip, population, homes, 'targetTerritoryId:', targetTerritoryId, 'addModeTerritoryId:', addModeTerritoryId);
-    if (!targetTerritoryId) {
-      console.log('🛠️ No targetTerritoryId set, returning');
-      return;
-    }
-    console.log('🛠️ Adding ZIP to territory', targetTerritoryId);
-
-    setTerritories(prevTerritories => {
-      console.log('🛠️ setTerritories called with prevTerritories:', prevTerritories.map(t => ({ id: t.id, name: t.name, zips: t.zips.length })));
-
-      // Check if territory exists in current state
-      const territoryExists = prevTerritories.some(t => t.id === targetTerritoryId);
-      console.log('🛠️ Territory exists in current state:', territoryExists, 'territories length:', prevTerritories.length);
-
-      if (!territoryExists) {
-        console.log('🛠️ ERROR: Territory not found in current state!', targetTerritoryId);
-        return prevTerritories; // Return unchanged state
-      }
-
-      return prevTerritories.map(t =>
-        t.id === targetTerritoryId
-          ? (() => {
-              const existingIndex = t.zips.findIndex(z => z.zip === zip);
-            if (existingIndex === -1) {
-              // ZIP not in territory - add it
-              console.log('🛠️ Adding ZIP', zip, 'to territory', t.name);
-              return { ...t, zips: [...t.zips, { zip, pop: population, standAloneHouses: homes }] };
-            } else if (updateExisting) {
-              // ZIP exists and we're updating data - update it
-              console.log('🛠️ Updating ZIP', zip, 'data in territory', t.name, 'population:', population, 'homes:', homes);
-              const newZips = [...t.zips];
-              newZips[existingIndex] = { zip, pop: population, standAloneHouses: homes };
-              return { ...t, zips: newZips };
-            } else {
-              // ZIP already in territory - remove it (toggle behavior)
-              console.log('🛠️ Removing ZIP', zip, 'from territory', t.name);
-              const newZips = [...t.zips];
-              newZips.splice(existingIndex, 1);
-              return { ...t, zips: newZips };
-            }
-            })()
-          : t
-      );
-    });
-  }, [addModeTerritoryId]); // Removed territories from dependencies since we use functional update
-
-
-  const handleSelectTerritory = (id) => {
-    setActiveTerritoryId(id);
-    if (mapContainerRef.current) {
-      mapContainerRef.current.zoomToTerritory(id);
-    } else {
-      setPendingZoomId(id);
-    }
-  };
-
-  const getTerritoryStats = (territory) => {
-    const zipPop = territory.zips.reduce((sum, z) => sum + (z.pop || 0), 0);
-    const zipHouses = territory.zips.reduce((sum, z) => sum + (z.standAloneHouses || 0), 0);
-    return {
-      population: zipPop,
-      standAloneHouses: zipHouses,
-      zipCount: territory.zips.length,
-    };
-  };
-
-  const handleUpdateTerritory = (id, name, color, zips) => {
-    setTerritories(territories.map(t => t.id === id ? { ...t, name, color, zips: zips || t.zips } : t));
-  };
-
-  const handleToggleTerritoryVisibility = (id) => {
-    setTerritories(territories.map(t => t.id === id ? { ...t, visible: !t.visible } : t));
-  };
 
   // Profile management functions (wrapped to work with hook)
   const saveProfile = useCallback(async () => {
