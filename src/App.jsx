@@ -21,6 +21,9 @@ if (typeof document !== 'undefined') {
 }
 
 function App() {
+  // Refs (must be declared before hooks that use them)
+  const mapContainerRef = useRef(null);
+
   // Territory management (extracted to hook)
   const {
     territories,
@@ -62,7 +65,6 @@ function App() {
 
   const [showBoundaries, setShowBoundaries] = useState(true);
   const [pendingZoomId, setPendingZoomId] = useState(null);
-  const mapContainerRef = useRef(null);
 
 
   // Profile management functions (wrapped to work with hook)
