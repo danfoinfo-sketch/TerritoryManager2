@@ -74,8 +74,8 @@ export default function MapComponent({ territories, activeTerritoryId, addModeTe
     const zip = feature.properties.ZCTA5CE20;
     const territory = territories.find(t => t.zips.some(z => z.zip === zip));
     return territory
-      ? { color: territory.color, weight: 2, fillColor: territory.color, fillOpacity: 0.6 }
-      : { color: '#0000ff', weight: 1, fillColor: '#0000ff', fillOpacity: 0.1 };
+      ? { color: territory.color, weight: 2.4, fillColor: territory.color, fillOpacity: 0.6 }
+      : { color: '#0000ff', weight: 1.2, fillColor: '#0000ff', fillOpacity: 0.1 };
   };
 
   const onZipClick = async (feature, layer) => {
@@ -105,7 +105,7 @@ export default function MapComponent({ territories, activeTerritoryId, addModeTe
   };
 
   const onZipHover = (feature, layer) => {
-    layer.setStyle({ weight: 3, color: '#ff0000' });
+    layer.setStyle({ weight: 3.6, color: '#ff0000' });
   };
 
   const onZipHoverOut = (feature, layer) => {

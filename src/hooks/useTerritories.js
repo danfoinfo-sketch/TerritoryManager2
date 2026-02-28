@@ -59,7 +59,8 @@ export function useTerritories(mapContainerRef) {
 
   const addZipToActiveTerritory = useCallback((zip, population, homes, territoryId = null, updateExisting = false) => {
     const targetTerritoryId = territoryId || addModeTerritoryId;
-    console.log('🛠️ addZipToActiveTerritory function called with', zip, population, homes, 'targetTerritoryId:', targetTerritoryId, 'addModeTerritoryId:', addModeTerritoryId);
+    const zipStr = String(zip ?? '');
+    console.log('🛠️ addZipToActiveTerritory function called with', zipStr, population, homes, 'targetTerritoryId:', targetTerritoryId, 'addModeTerritoryId:', addModeTerritoryId);
     if (!targetTerritoryId) {
       console.log('🛠️ No targetTerritoryId set, returning');
       return;
@@ -81,20 +82,24 @@ export function useTerritories(mapContainerRef) {
       return prevTerritories.map(t =>
         t.id === targetTerritoryId
           ? (() => {
-              const existingIndex = t.zips.findIndex(z => z.zip === zip);
+              const existingIndex = t.zips.findIndex(z => String(z.zip) === zipStr);
             if (existingIndex === -1) {
               // ZIP not in territory - add it
-              console.log('🛠️ Adding ZIP', zip, 'to territory', t.name);
-              return { ...t, zips: [...t.zips, { zip, pop: population, standAloneHouses: homes }] };
+              console.log('🛠️ Adding ZIP', zipStr, 'to territory', t.name);
+              return { ...t, zips: [...t.zips, { zip: zipStr, pop: population, standAloneHouses: homes }] };
             } else if (updateExisting) {
               // ZIP exists and we're updating data - update it
-              console.log('🛠️ Updating ZIP', zip, 'data in territory', t.name, 'population:', population, 'homes:', homes);
+              console.log('🛠️ Updating ZIP', zipStr, 'data in territory', t.name, 'population:', population, 'homes:', homes);
               const newZips = [...t.zips];
-              newZips[existingIndex] = { zip, pop: population, standAloneHouses: homes };
+              newZips[existingIndex] = { zip: zipStr, pop: population, standAloneHouses: homes };
               return { ...t, zips: newZips };
+            } else if (territoryId) {
+              // Add mode: ZIP already in territory, do not toggle off – leave as-is (or could update if we had data)
+              console.log('🛠️ Add mode: ZIP', zipStr, 'already in territory', t.name, '- keeping');
+              return t;
             } else {
-              // ZIP already in territory - remove it (toggle behavior)
-              console.log('🛠️ Removing ZIP', zip, 'from territory', t.name);
+              // Not in add mode: toggle remove
+              console.log('🛠️ Removing ZIP', zipStr, 'from territory', t.name);
               const newZips = [...t.zips];
               newZips.splice(existingIndex, 1);
               return { ...t, zips: newZips };

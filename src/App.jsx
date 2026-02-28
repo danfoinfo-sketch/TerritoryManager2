@@ -1,24 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, Loader2 } from 'lucide-react';
 import MapboxMapContainer from './components/map/MapboxMapContainer';
 import Sidebar from './components/Sidebar';
 import { useMapSearch } from './hooks/useMapSearch';
 import { useProfiles } from './hooks/useProfiles';
 import { useTerritories } from './hooks/useTerritories';
-
-// Add CSS animation for loading spinner
-const spinnerStyle = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-
-// Inject the CSS
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = spinnerStyle;
-  document.head.appendChild(style);
-}
+import './App.css';
 
 function App() {
   // Refs (must be declared before hooks that use them)
@@ -65,6 +52,19 @@ function App() {
 
   const [showBoundaries, setShowBoundaries] = useState(true);
   const [pendingZoomId, setPendingZoomId] = useState(null);
+  const [sidebarTheme, setSidebarTheme] = useState(() => {
+    try {
+      return (localStorage.getItem('sidebarTheme') || 'dark');
+    } catch {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebarTheme', sidebarTheme);
+    } catch (_) {}
+  }, [sidebarTheme]);
 
 
   // Profile management functions (wrapped to work with hook)
@@ -99,63 +99,32 @@ function App() {
         width: '350px',
         maxWidth: '90vw',
       }}>
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          background: 'white',
-          borderRadius: '8px',
-          padding: '8px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-          border: '1px solid #e5e7eb',
-        }}>
+        <div className="search-bar">
           <input
             type="text"
+            className="search-bar__input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search ZIP, city, state..."
-            style={{
-              flex: 1,
-              border: 'none',
-              outline: 'none',
-              fontSize: '16px',
-              padding: '4px 8px',
-              background: 'transparent',
-            }}
+            placeholder="Search ZIP, city, state."
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 handleSearch();
               }
             }}
             disabled={searchLoading}
+            aria-label="Search ZIP, city, state"
           />
           <button
             type="button"
+            className="search-bar__btn search-bar__btn--primary"
             onClick={handleSearch}
             disabled={!searchQuery.trim() || searchLoading}
-            style={{
-              padding: '8px',
-              background: searchQuery.trim() && !searchLoading ? '#3b82f6' : '#9ca3af',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: searchQuery.trim() && !searchLoading ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: '40px',
-            }}
+            aria-label="Search"
           >
             {searchLoading ? (
-              <div style={{
-                width: '16px',
-                height: '16px',
-                border: '2px solid #ffffff',
-                borderTop: '2px solid transparent',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }} />
+              <Loader2 size={20} className="spin" aria-hidden />
             ) : (
-              '🔍'
+              <Search size={20} aria-hidden />
             )}
           </button>
         </div>
@@ -164,6 +133,8 @@ function App() {
       <Sidebar
         className="sidebar"
         style={{ width: 300, height: '100vh', zIndex: 1000, background: 'white', overflowY: 'auto', boxShadow: '2px 0 5px rgba(0,0,0,0.1)', flexShrink: 0 }}
+        theme={sidebarTheme}
+        onThemeChange={setSidebarTheme}
         territories={territories}
         activeTerritoryId={activeTerritoryId}
         addModeTerritoryId={addModeTerritoryId}
@@ -194,6 +165,7 @@ function App() {
           activeTerritoryId={activeTerritoryId}
           setActiveTerritoryId={setActiveTerritoryId}
           addModeTerritoryId={addModeTerritoryId}
+          setAddModeTerritoryId={setAddModeTerritoryId}
           addZipToActiveTerritory={addZipToActiveTerritory}
           showBoundaries={showBoundaries}
         />
@@ -201,44 +173,17 @@ function App() {
 
       {/* Save Profile Modal */}
       {showSaveProfileModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-        }}>
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-            minWidth: '300px',
-            maxWidth: '400px',
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: '15px' }}>Save Territory Profile</h3>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                Profile Name:
-              </label>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3 className="modal-title">Save Territory Profile</h3>
+            <div style={{ marginBottom: '16px' }}>
+              <label className="modal-label">Profile Name:</label>
               <input
                 type="text"
+                className="modal-input"
                 value={saveProfileName}
                 onChange={(e) => setSaveProfileName(e.target.value)}
                 placeholder="Enter profile name..."
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  boxSizing: 'border-box',
-                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     saveProfile();
@@ -249,31 +194,19 @@ function App() {
                 autoFocus
               />
             </div>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <div className="modal-actions">
               <button
+                type="button"
+                className="modal-btn modal-btn--secondary"
                 onClick={() => setShowSaveProfileModal(false)}
-                style={{
-                  padding: '8px 16px',
-                  background: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
               >
                 Cancel
               </button>
               <button
+                type="button"
+                className="modal-btn modal-btn--primary"
                 onClick={saveProfile}
                 disabled={!saveProfileName.trim() || savingProfile}
-                style={{
-                  padding: '8px 16px',
-                  background: (!saveProfileName.trim() || savingProfile) ? '#9ca3af' : '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: (!saveProfileName.trim() || savingProfile) ? 'not-allowed' : 'pointer',
-                }}
               >
                 {savingProfile ? 'Saving...' : 'Save Profile'}
               </button>

@@ -43,51 +43,28 @@ export const fetchZipPopulationAndHouses = async (zip) => {
     throw new Error(`Invalid ZIP code format: ${zip}`);
   }
 
-  // Test API key with a known working ZIP code first
-  if (zip !== '10001') { // Avoid infinite loop
-    try {
-      console.log(`Testing API key with known ZIP 10001...`);
-      const testResponse = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:10001&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
-      if (testResponse.ok) {
-        console.log(`✅ API key is working (tested with ZIP 10001)`);
-        const testData = await testResponse.json();
-        console.log(`Test data for 10001: Population=${testData[1][0]}, Houses=${testData[1][1]}`);
-      } else {
-        console.log(`❌ API key test failed with ZIP 10001: ${testResponse.status}`);
-      }
-    } catch (testError) {
-      console.log(`❌ API key test error:`, testError.message);
-    }
-  }
-
   try {
     console.log(`Fetching census data for ZIP: ${zip}`);
 
-    // First try with ZCTA (most common)
-    let response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+    // 2022 ACS uses geography "zip code tabulation area" (not "zcta"); try it first
+    let response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zip%20code%20tabulation%20area:${zip}&key=${CENSUS_API_KEY}`);
 
-    // If ZCTA fails, try with zip code tabulation area
+    // If that fails, try 2020 ACS (sometimes different geography support)
     if (!response.ok) {
-      console.log(`ZCTA failed for ${zip}, trying zip code tabulation area...`);
-      response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zip%20code%20tabulation%20area:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
-    }
-
-    // If that fails, try 2020 ACS
-    if (!response.ok) {
-      console.log(`ZIP Code Tabulation Area failed for ${zip}, trying 2020 ACS...`);
-      response = await fetch(`https://api.census.gov/data/2020/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+      console.log(`2022 ACS failed for ${zip}, trying 2020 ACS...`);
+      response = await fetch(`https://api.census.gov/data/2020/acs/acs5?get=B01003_001E,B25024_002E&for=zip%20code%20tabulation%20area:${zip}&key=${CENSUS_API_KEY}`);
     }
 
     // If that fails, try 2020 Decennial Census
     if (!response.ok) {
       console.log(`2020 ACS failed for ${zip}, trying 2020 Decennial Census...`);
-      response = await fetch(`https://api.census.gov/data/2020/dec/pl?get=P1_001N,H1_001N&for=zcta:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+      response = await fetch(`https://api.census.gov/data/2020/dec/pl?get=P1_001N,H1_001N&for=zip%20code%20tabulation%20area:${zip}&key=${CENSUS_API_KEY}`);
     }
 
-    // If that fails, try without ZCTA prefix (direct ZIP)
+    // Last resort: try zcta shorthand (older endpoints)
     if (!response.ok) {
-      console.log(`Decennial Census failed for ${zip}, trying direct ZIP lookup...`);
-      response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zip%20code:${zip}&key=0a85b2c9a4ae36ec7479013358c9002da2149c34`);
+      console.log(`Trying zcta shorthand for ${zip}...`);
+      response = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B01003_001E,B25024_002E&for=zcta:${zip}&key=${CENSUS_API_KEY}`);
     }
 
     if (!response.ok) {

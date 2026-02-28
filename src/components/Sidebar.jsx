@@ -1,4 +1,5 @@
 import React from 'react';
+import { Save, FolderOpen, Plus, Trash2, MapPin, Eye, EyeOff, Sun, Moon } from 'lucide-react';
 
 export default function Sidebar({
   territories,
@@ -20,6 +21,8 @@ export default function Sidebar({
   loadingProfiles,
   savingProfile,
   loadingProfile,
+  theme = 'dark',
+  onThemeChange,
 }) {
   console.log('Sidebar received profile props:', { savedProfiles, onSaveProfile, showLoadProfile });
   // Debug: log territories received by sidebar
@@ -48,253 +51,213 @@ export default function Sidebar({
       }
     };
   }, []);
+
   return (
-    <div className="sidebar" style={{ width: 300, position: 'absolute', left: 0, top: 0, height: '100vh', zIndex: 1000, background: 'white', overflowY: 'auto', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-        Territory Manager (ZIPs Only)
-      </h2>
+    <div className={`sidebar ${theme === 'light' ? 'sidebar--light' : ''}`}>
+      <div className="sidebar__inner">
+        <h2 className="sidebar__title">Territory Manager</h2>
 
-      {/* Profile Management Section */}
-      <div style={{ marginBottom: '1.5rem', padding: '12px', background: '#f8fafc', borderRadius: '6px' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#374151' }}>
-          Profiles
-        </h3>
+        {/* Profile Management Section */}
+        <div className="sidebar__card">
+          <h3 className="sidebar__card-title">Profiles</h3>
+          <div className="sidebar__btn-row">
+            <button
+              type="button"
+              className="sidebar__btn sidebar__btn--primary"
+              onClick={() => {
+                console.log('Save Profile As clicked');
+                onSaveProfile();
+              }}
+              disabled={savingProfile || loadingProfiles}
+              aria-label="Save profile as"
+            >
+              <Save size={16} aria-hidden />
+              {savingProfile ? 'Saving...' : 'Save Profile As…'}
+            </button>
+            <button
+              type="button"
+              className="sidebar__btn sidebar__btn--secondary"
+              onClick={() => setShowLoadProfile(!showLoadProfile)}
+              disabled={loadingProfiles || loadingProfile}
+              aria-label="Load profile"
+            >
+              <FolderOpen size={16} aria-hidden />
+              {loadingProfiles ? 'Loading...' : 'Load Profile'}
+            </button>
+          </div>
+          {showLoadProfile && (
+            <div style={{ marginTop: '8px' }}>
+              {loadingProfiles ? (
+                <p className="sidebar__empty">Loading profiles...</p>
+              ) : savedProfiles.length === 0 ? (
+                <p className="sidebar__empty">No saved profiles yet</p>
+              ) : (
+                <select
+                  className="sidebar__select"
+                  onChange={(e) => {
+                    if (e.target.value && !loadingProfile) {
+                      onLoadProfile(e.target.value);
+                      e.target.value = '';
+                    }
+                  }}
+                  disabled={loadingProfile}
+                  aria-label="Choose a profile"
+                >
+                  <option value="">
+                    {loadingProfile ? 'Loading profile...' : 'Choose a profile...'}
+                  </option>
+                  {savedProfiles.map(profileName => (
+                    <option key={profileName} value={profileName}>
+                      {profileName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+        </div>
 
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+        <div className="sidebar__section">
           <button
             type="button"
-            onClick={() => {
-              console.log('Save Profile As clicked');
-              onSaveProfile();
-            }}
-            disabled={savingProfile || loadingProfiles}
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              background: savingProfile || loadingProfiles ? '#9ca3af' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '0.85rem',
-              fontWeight: '500',
-              cursor: savingProfile || loadingProfiles ? 'not-allowed' : 'pointer',
-              zIndex: 1001,
-            }}
+            className="sidebar__btn sidebar__btn--green"
+            onClick={onAddTerritory}
+            aria-label="Create new territory"
           >
-            {savingProfile ? 'Saving...' : 'Save Profile As…'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowLoadProfile(!showLoadProfile)}
-            disabled={loadingProfiles || loadingProfile}
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              background: loadingProfiles || loadingProfile ? '#9ca3af' : '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '0.85rem',
-              fontWeight: '500',
-              cursor: loadingProfiles || loadingProfile ? 'not-allowed' : 'pointer',
-              zIndex: 1001,
-            }}
-          >
-            {loadingProfiles ? 'Loading...' : 'Load Profile'}
+            <Plus size={18} aria-hidden />
+            Create New Territory
           </button>
         </div>
 
-        {showLoadProfile && (
-          <div style={{ marginTop: '8px' }}>
-            {loadingProfiles ? (
-              <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0 }}>
-                Loading profiles...
-              </p>
-            ) : savedProfiles.length === 0 ? (
-              <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0 }}>
-                No saved profiles yet
-              </p>
-            ) : (
-              <select
-                onChange={(e) => {
-                  if (e.target.value && !loadingProfile) {
-                    onLoadProfile(e.target.value);
-                    e.target.value = '';
-                  }
-                }}
-                disabled={loadingProfile}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  borderRadius: '4px',
-                  border: '1px solid #d1d5db',
-                  background: loadingProfile ? '#f9fafb' : 'white',
-                  fontSize: '0.8rem',
-                  cursor: loadingProfile ? 'not-allowed' : 'default',
-                }}
-              >
-                <option value="">
-                  {loadingProfile ? 'Loading profile...' : 'Choose a profile...'}
-                </option>
-                {savedProfiles.map(profileName => (
-                  <option key={profileName} value={profileName}>
-                    {profileName}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        )}
-      </div>
+        <h3 className="sidebar__section-title">Territories ({territories.length})</h3>
 
-      <button
-        type="button"
-        onClick={onAddTerritory}
-        style={{
-          width: '100%',
-          padding: '12px',
-          background: '#10b981',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          fontWeight: '600',
-          marginBottom: '1rem',
-          cursor: 'pointer',
-        }}
-      >
-        Create New Territory
-      </button>
+        {territories.length === 0 ? (
+          <p className="sidebar__empty">
+            No territories yet. Create one and click "Add ZIPs" to start!
+          </p>
+        ) : (
+          <ul className="sidebar__territory-list">
+            {territories.map((territory) => {
+              const pop = territory.zips.reduce((sum, z) => sum + (z.pop || 0), 0);
+              const homes = territory.zips.reduce((sum, z) => sum + (z.standAloneHouses || 0), 0);
+              const isActive = activeTerritoryId === territory.id;
+              const isAddMode = addModeTerritoryId === territory.id;
 
-
-      <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>
-        Territories ({territories.length})
-      </h3>
-
-      {territories.length === 0 ? (
-        <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-          No territories yet. Create one and click "Add ZIPs" to start!
-        </p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-                    {territories.map((territory) => {
-
-            return (
-              <li
-                key={territory.id}
-                style={{
-                  padding: '10px',
-                  background: activeTerritoryId === territory.id ? '#dbeafe' : '#f1f5f9',
-                  borderRadius: '6px',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  cursor: 'pointer',
-                  border: activeTerritoryId === territory.id ? '2px solid #3b82f6' : 'none',
-                }}
-                                                onClick={(e) => {
-                  // Don't trigger territory selection if clicking on a button
-                  if (e.target.tagName === 'BUTTON') {
-                    console.log('DEBUG: Button clicked, not selecting territory');
-                    return;
-                  }
-                  console.log('DEBUG: Territory clicked:', territory.name, 'id:', territory.id);
-                  setActiveTerritoryId(territory.id);
-                  console.log('DEBUG: Calling zoomToTerritory for', territory.id);
-                  zoomToTerritory(territory.id);
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: territory.color, fontSize: '1.2rem' }}>●</span>
-                    <span style={{ fontWeight: activeTerritoryId === territory.id ? 'bold' : 'normal' }}>
-                      {territory.name}
-                    </span>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteTerritory(territory.id);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#ef4444',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-
-                                <div style={{ marginTop: '8px', fontSize: '0.9rem', color: '#4b5563' }}>
-                  <div>Pop: {territory.zips.reduce((sum, z) => sum + z.pop, 0).toLocaleString()}</div>
-                  <div>Homes: {territory.zips.reduce((sum, z) => sum + z.standAloneHouses, 0).toLocaleString()}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '4px' }}>
-                    ZIPs: {territory.zips.length}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+              return (
+                <li key={territory.id} className="sidebar__territory-item">
                   <div
+                    className={`sidebar__territory-card ${isActive ? 'active' : ''}`}
                     onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('🔥 Add/Save button clicked for territory', territory.id, 'current addModeTerritoryId:', addModeTerritoryId);
-
-                      if (addModeTerritoryId === territory.id) {
-                        // Currently in add mode for this territory - exit add mode
-                        console.log('🔥 Exiting add mode for territory', territory.id);
-                        setAddModeTerritoryId(null);
-                      } else {
-                        // Enter add mode for this territory (or switch to this territory if in add mode for another)
-                        console.log('🔥 Entering add mode for territory', territory.id);
-                        setAddModeTerritoryId(territory.id);
+                      if (e.target.closest('button') || e.target.closest('[role="button"]')) {
+                        console.log('DEBUG: Button clicked, not selecting territory');
+                        return;
                       }
-                    }}
-                    style={{
-                      padding: '4px 8px',
-                      background: addModeTerritoryId === territory.id ? '#10b981' : '#6b7280',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      zIndex: 10,
-                      display: 'inline-block',
-                      userSelect: 'none',
+                      console.log('DEBUG: Territory clicked:', territory.name, 'id:', territory.id);
+                      setActiveTerritoryId(territory.id);
+                      console.log('DEBUG: Calling zoomToTerritory for', territory.id);
+                      zoomToTerritory(territory.id);
                     }}
                   >
-                    {addModeTerritoryId === territory.id ? 'Save Territory' : 'Add ZIPs'}
+                    <div className="sidebar__territory-header">
+                      <span className="sidebar__territory-name">
+                        <span
+                          className="sidebar__territory-dot"
+                          style={{ backgroundColor: territory.color }}
+                          aria-hidden
+                        />
+                        {territory.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="sidebar__territory-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteTerritory(territory.id);
+                        }}
+                        aria-label={`Delete ${territory.name}`}
+                      >
+                        <Trash2 size={16} aria-hidden />
+                      </button>
+                    </div>
+                    <div className="sidebar__territory-stats">
+                      <span className="sidebar__territory-badge">
+                        Pop: {pop.toLocaleString()}
+                      </span>
+                      <span className="sidebar__territory-badge">
+                        Homes: {homes.toLocaleString()}
+                      </span>
+                      <span className="sidebar__territory-badge">
+                        Zips: {territory.zips.length}
+                      </span>
+                    </div>
+                    <div className="sidebar__territory-actions">
+                      <button
+                        type="button"
+                        className={`sidebar__btn sidebar__btn--sm sidebar__btn--green-sm ${isAddMode ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('🔥 Add/Save button clicked for territory', territory.id, 'current addModeTerritoryId:', addModeTerritoryId);
+                          if (addModeTerritoryId === territory.id) {
+                            console.log('🔥 Exiting add mode for territory', territory.id);
+                            setAddModeTerritoryId(null);
+                          } else {
+                            console.log('🔥 Entering add mode for territory', territory.id);
+                            setAddModeTerritoryId(territory.id);
+                          }
+                        }}
+                        aria-label={isAddMode ? 'Save territory' : 'Add ZIPs to territory'}
+                      >
+                        <MapPin size={14} aria-hidden />
+                        {isAddMode ? 'Save Territory' : 'Add ZIPs'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
-      <div style={{ marginTop: '2rem' }}>
-        <button
-          onClick={() => setShowBoundaries(!showBoundaries)}
-          style={{
-            width: '100%',
-            padding: '10px 12px',
-            borderRadius: '6px',
-            border: '1px solid #d1d5db',
-            background: showBoundaries ? '#10b981' : '#6b7280',
-            color: 'white',
-            fontSize: '0.95rem',
-            fontWeight: '500',
-            cursor: 'pointer',
-            transition: 'background-color 0.2s',
-          }}
-        >
-          {showBoundaries ? '🗺️ Hide Boundaries' : '🗺️ Show Boundaries'}
-        </button>
+        <div className="sidebar__bottom">
+          <button
+            type="button"
+            className={`sidebar__btn sidebar__btn--outline ${showBoundaries ? 'active' : ''}`}
+            onClick={() => setShowBoundaries(!showBoundaries)}
+            aria-label={showBoundaries ? 'Hide boundaries' : 'Show boundaries'}
+          >
+            {showBoundaries ? (
+              <>
+                <Eye size={18} aria-hidden />
+                Hide Boundaries
+              </>
+            ) : (
+              <>
+                <EyeOff size={18} aria-hidden />
+                Show Boundaries
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {onThemeChange && (
+        <div className="sidebar__theme-corner">
+          <button
+            type="button"
+            className="sidebar__theme-btn"
+            onClick={() => onThemeChange(theme === 'dark' ? 'light' : 'dark')}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          >
+            {theme === 'dark' ? (
+              <Sun size={22} aria-hidden />
+            ) : (
+              <Moon size={22} aria-hidden />
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
