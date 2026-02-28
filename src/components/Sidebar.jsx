@@ -1,5 +1,5 @@
-import React from 'react';
-import { Save, FolderOpen, Plus, Trash2, MapPin, Eye, EyeOff, Sun, Moon } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Save, FolderOpen, Plus, Trash2, MapPin, Eye, EyeOff, Sun, Moon, Pencil } from 'lucide-react';
 
 export default function Sidebar({
   territories,
@@ -8,6 +8,7 @@ export default function Sidebar({
   onSelectTerritory,
   onAddTerritory,
   onDeleteTerritory,
+  onUpdateTerritory,
   showBoundaries,
   setShowBoundaries,
   setAddModeTerritoryId,
@@ -24,6 +25,16 @@ export default function Sidebar({
   theme = 'dark',
   onThemeChange,
 }) {
+  const [editingTerritoryId, setEditingTerritoryId] = useState(null);
+  const [editingName, setEditingName] = useState('');
+  const editInputRef = useRef(null);
+
+  useEffect(() => {
+    if (editingTerritoryId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingTerritoryId]);
   console.log('Sidebar received profile props:', { savedProfiles, onSaveProfile, showLoadProfile });
   // Debug: log territories received by sidebar
   React.useEffect(() => {
@@ -148,8 +159,7 @@ export default function Sidebar({
                   <div
                     className={`sidebar__territory-card ${isActive ? 'active' : ''}`}
                     onClick={(e) => {
-                      if (e.target.closest('button') || e.target.closest('[role="button"]')) {
-                        console.log('DEBUG: Button clicked, not selecting territory');
+                      if (e.target.closest('button') || e.target.closest('[role="button"]') || e.target.closest('input')) {
                         return;
                       }
                       console.log('DEBUG: Territory clicked:', territory.name, 'id:', territory.id);
@@ -165,19 +175,68 @@ export default function Sidebar({
                           style={{ backgroundColor: territory.color }}
                           aria-hidden
                         />
-                        {territory.name}
+                        {editingTerritoryId === territory.id ? (
+                          <input
+                            ref={editInputRef}
+                            type="text"
+                            className="sidebar__territory-name-input"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const trimmed = editingName.trim();
+                                if (trimmed && onUpdateTerritory) {
+                                  onUpdateTerritory(territory.id, trimmed, territory.color, territory.zips);
+                                }
+                                setEditingTerritoryId(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingTerritoryId(null);
+                                setEditingName('');
+                              }
+                            }}
+                            onBlur={() => {
+                              const trimmed = editingName.trim();
+                              if (trimmed && onUpdateTerritory) {
+                                onUpdateTerritory(territory.id, trimmed, territory.color, territory.zips);
+                              }
+                              setEditingTerritoryId(null);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Edit territory name"
+                          />
+                        ) : (
+                          territory.name
+                        )}
                       </span>
-                      <button
-                        type="button"
-                        className="sidebar__territory-delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteTerritory(territory.id);
-                        }}
-                        aria-label={`Delete ${territory.name}`}
-                      >
-                        <Trash2 size={16} aria-hidden />
-                      </button>
+                      <span className="sidebar__territory-header-actions">
+                        {onUpdateTerritory && editingTerritoryId !== territory.id && (
+                          <button
+                            type="button"
+                            className="sidebar__territory-rename"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTerritoryId(territory.id);
+                              setEditingName(territory.name);
+                            }}
+                            aria-label={`Rename ${territory.name}`}
+                            title="Rename territory"
+                          >
+                            <Pencil size={14} aria-hidden />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="sidebar__territory-delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteTerritory(territory.id);
+                          }}
+                          aria-label={`Delete ${territory.name}`}
+                        >
+                          <Trash2 size={16} aria-hidden />
+                        </button>
+                      </span>
                     </div>
                     <div className="sidebar__territory-stats">
                       <span className="sidebar__territory-badge">
