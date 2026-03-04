@@ -23,6 +23,7 @@ function App() {
     handleSetAddModeTerritoryId,
     handleToggleTerritoryVisibility,
     addZipToActiveTerritory,
+    clearTerritories,
     getTerritoryStats,
     setTerritories,
     setActiveTerritoryId,
@@ -40,6 +41,8 @@ function App() {
     loadingProfile,
     saveProfile: saveProfileToFirestore,
     loadProfile: loadProfileFromFirestore,
+    deleteProfile,
+    renameProfile,
     openSaveProfileModal,
     setShowLoadProfile,
     setShowSaveProfileModal,
@@ -60,6 +63,8 @@ function App() {
     }
   });
 
+  const [currentProfileName, setCurrentProfileName] = useState('New');
+
   useEffect(() => {
     try {
       localStorage.setItem('sidebarTheme', sidebarTheme);
@@ -78,9 +83,15 @@ function App() {
       setTerritories(loadedTerritories);
       setActiveTerritoryId(null);
       setAddModeTerritoryId(null);
+      setCurrentProfileName(profileName);
       setShowLoadProfile(false);
     }
   }, [loadProfileFromFirestore, territories]);
+
+  const handleClearTerritories = useCallback(() => {
+    clearTerritories();
+    setCurrentProfileName('New');
+  }, [clearTerritories]);
 
   useEffect(() => {
     console.log('Sidebar element exists?', document.querySelector('.sidebar'));
@@ -145,6 +156,7 @@ function App() {
         onDeleteTerritory={handleDeleteTerritory}
         onToggleTerritoryVisibility={handleToggleTerritoryVisibility}
         onAddZipToTerritory={addZipToActiveTerritory}
+        onClearTerritories={handleClearTerritories}
         zoomToTerritory={handleSelectTerritory}
         showBoundaries={showBoundaries}
         setShowBoundaries={setShowBoundaries}
@@ -152,6 +164,9 @@ function App() {
         savedProfiles={savedProfiles}
         onSaveProfile={openSaveProfileModal}
         onLoadProfile={loadProfile}
+        onDeleteProfile={deleteProfile}
+        onRenameProfile={renameProfile}
+        currentProfileName={currentProfileName}
         showLoadProfile={showLoadProfile}
         setShowLoadProfile={setShowLoadProfile}
         loadingProfiles={loadingProfiles}

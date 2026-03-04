@@ -121,20 +121,15 @@ export function useMapLayers(mapRef, territories, activeTerritoryId, addModeTerr
           }
         });
 
-        // Add ZIP highlight layer for selected territories
-        const allSelectedZips = territories
-          .filter(t => t.id === activeTerritoryId || t.id === addModeTerritoryId)
-          .flatMap(t => t.zips || [])
-          .map(zipObj => String(zipObj.zip ?? zipObj));
-
-        console.log('🗺️ Adding territory layers for selected ZIPs:', allSelectedZips);
+        // Add ZIP highlight layer (filters will be set dynamically)
+        console.log('🗺️ Adding territory highlight layers (filters set dynamically)');
 
         map.addLayer({
           id: 'zip-highlight',
           type: 'fill',
           source: VECTOR_SOURCE_ID,
           'source-layer': VECTOR_SOURCE_LAYER,
-          filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', allSelectedZips]],
+          filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', []]],
           paint: {
             'fill-color': '#00ff00',
             'fill-opacity': 0.5
@@ -148,7 +143,7 @@ export function useMapLayers(mapRef, territories, activeTerritoryId, addModeTerr
           type: 'fill',
           source: VECTOR_SOURCE_ID,
           'source-layer': VECTOR_SOURCE_LAYER,
-          filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', allSelectedZips]],
+          filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', []]],
           paint: {
             'fill-color': '#ffffff',
             'fill-opacity': 0.8
@@ -162,7 +157,7 @@ export function useMapLayers(mapRef, territories, activeTerritoryId, addModeTerr
           type: 'line',
           source: VECTOR_SOURCE_ID,
           'source-layer': VECTOR_SOURCE_LAYER,
-          filter: ['!', ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', allSelectedZips]]],
+          filter: ['!', ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', []]]],
           minzoom: MIN_ZOOM_ZIP_VISIBLE,
           paint: {
             'line-color': '#666',
@@ -182,7 +177,7 @@ export function useMapLayers(mapRef, territories, activeTerritoryId, addModeTerr
           type: 'line',
           source: VECTOR_SOURCE_ID,
           'source-layer': VECTOR_SOURCE_LAYER,
-          filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', allSelectedZips]],
+          filter: ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', []]],
           paint: {
             'line-color': '#000000',
             'line-width': 3.6,
@@ -190,7 +185,7 @@ export function useMapLayers(mapRef, territories, activeTerritoryId, addModeTerr
           }
         }, 'zip-highlight');
 
-        console.log('✅ ZIP layers re-added, selectedZips restored:', allSelectedZips);
+        console.log('✅ ZIP layers re-added');
 
         // Ensure only one click handler: remove any existing then add (sourcedata can fire multiple times)
         map.off('click', 'zip-fills-new');
@@ -219,37 +214,21 @@ export function useMapLayers(mapRef, territories, activeTerritoryId, addModeTerr
           setTerritoryTooltip(null);
         });
 
-        // Clear selections when clicking elsewhere on map
+        // Clear selections when clicking elsewhere on map (but preserve "show all territories" mode)
         map.on('click', (e) => {
           const clickedFeatures = map.queryRenderedFeatures(e.point, { layers: ['zip-fills-new'] });
           // Get current addModeTerritoryId from the latest props
           const currentAddModeId = localAddModeTerritoryIdRef.current;
           console.log('Map click - features:', clickedFeatures?.length || 0, 'addModeTerritoryId:', currentAddModeId, 'shiftKey:', e.originalEvent.shiftKey);
-          if ((!clickedFeatures || clickedFeatures.length === 0) && !currentAddModeId && !e.originalEvent.shiftKey) {
-            console.log('Background click - clearing all ZIP selections and active territory');
+
+          // Only clear selections if we actually clicked on a ZIP or are in add mode
+          // Don't clear when just clicking empty space in "show all territories" mode
+          if (clickedFeatures && clickedFeatures.length > 0) {
+            console.log('ZIP clicked - clearing selections as expected');
             setSelectedZips([]);
-            // Also clear the active territory selection
-            setActiveTerritoryId(null);
-
-            // Clear all territory layer filters
-            const layersToClear = ['zip-highlight', 'zip-border', 'territory-mask', 'territory-perimeter'];
-            layersToClear.forEach(layerId => {
-              if (map.getLayer(layerId)) {
-                map.setFilter(layerId, ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', []]]);
-              }
-            });
-
-            // Update zip-outlines-new filter (clear all selections - show all lines)
-            if (map.getLayer('zip-outlines-new')) {
-              map.setFilter('zip-outlines-new', null);
-              map.setPaintProperty('zip-outlines-new', 'line-opacity', 0.8);
-              map.setLayoutProperty('zip-outlines-new', 'visibility', 'visible');
-              console.log('Line layer filter/opacity applied — selected ZIPs excluded:', []);
-            }
-
-            console.log('Mask & outline updates applied - cleared all selections');
-            map.triggerRepaint();
+            // Don't clear active territory here - let the ZIP click handler manage that
           }
+          // For background clicks, don't clear territory selections to preserve "show all territories" mode
         });
 
         // Add zoom change listener

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Save, FolderOpen, Plus, Trash2, MapPin, Eye, EyeOff, Sun, Moon, Pencil } from 'lucide-react';
+import { Save, FolderOpen, Plus, Trash2, MapPin, Eye, EyeOff, Sun, Moon, Pencil, Edit3, X, FilePlus, Download } from 'lucide-react';
 
 export default function Sidebar({
   territories,
@@ -9,6 +9,7 @@ export default function Sidebar({
   onAddTerritory,
   onDeleteTerritory,
   onUpdateTerritory,
+  onClearTerritories,
   showBoundaries,
   setShowBoundaries,
   setAddModeTerritoryId,
@@ -17,6 +18,9 @@ export default function Sidebar({
   savedProfiles,
   onSaveProfile,
   onLoadProfile,
+  onDeleteProfile,
+  onRenameProfile,
+  currentProfileName,
   showLoadProfile,
   setShowLoadProfile,
   loadingProfiles,
@@ -27,7 +31,13 @@ export default function Sidebar({
 }) {
   const [editingTerritoryId, setEditingTerritoryId] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [editingProfileName, setEditingProfileName] = useState(null);
+  const [editingProfileNewName, setEditingProfileNewName] = useState('');
+  const [profileToDelete, setProfileToDelete] = useState(null);
+  const [exportMode, setExportMode] = useState(false);
+  const [selectedTerritoriesForExport, setSelectedTerritoriesForExport] = useState(new Set());
   const editInputRef = useRef(null);
+  const editProfileInputRef = useRef(null);
 
   useEffect(() => {
     if (editingTerritoryId && editInputRef.current) {
@@ -35,18 +45,92 @@ export default function Sidebar({
       editInputRef.current.select();
     }
   }, [editingTerritoryId]);
-  console.log('Sidebar received profile props:', { savedProfiles, onSaveProfile, showLoadProfile });
+
+  useEffect(() => {
+    if (editingProfileName && editProfileInputRef.current) {
+      editProfileInputRef.current.focus();
+      editProfileInputRef.current.select();
+    }
+  }, [editingProfileName]);
   // Debug: log territories received by sidebar
   React.useEffect(() => {
     console.log('📋 Sidebar received territories:', territories.map(t => ({ id: t.id, name: t.name, zips: t.zips.length })));
   }, [territories]);
 
-  // Debug: Add global click listener to sidebar
+  // Generate and download CSV export
+  const handleExport = () => {
+    if (selectedTerritoriesForExport.size === 0) return;
+
+    const csvData = [];
+    // Add header
+    csvData.push(['Profile', 'Territory Title', 'Population', 'Homes', 'ZIP Count', 'ZIPs']);
+
+    // Add data for each selected territory
+    selectedTerritoriesForExport.forEach(territoryId => {
+      const territory = territories.find(t => t.id === territoryId);
+      if (territory) {
+        const pop = territory.zips.reduce((sum, z) => sum + (z.pop || 0), 0);
+        const homes = territory.zips.reduce((sum, z) => sum + (z.standAloneHouses || 0), 0);
+        const zipCodes = territory.zips.map(z => z.zip).join('; ');
+
+        csvData.push([
+          currentProfileName,
+          territory.name,
+          pop.toString(),
+          homes.toString(),
+          territory.zips.length.toString(),
+          zipCodes
+        ]);
+      }
+    });
+
+    // Convert to CSV string
+    const csvContent = csvData.map(row =>
+      row.map(field => `"${field}"`).join(',')
+    ).join('\n');
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${currentProfileName.replace(/[^a-z0-9]/gi, '_')}_territories.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Exit export mode
+    setExportMode(false);
+    setSelectedTerritoriesForExport(new Set());
+  };
+
+  // Handle sidebar clicks for deselection
   React.useEffect(() => {
     const handleSidebarClick = (e) => {
-      console.log('📱 Sidebar click detected at:', e.target.tagName, e.target.className);
-      if (e.target.tagName === 'BUTTON') {
-        console.log('📱 Button clicked:', e.target.textContent);
+      // Check if click is on interactive elements that should not trigger deselection
+      const interactiveElements = [
+        'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'
+      ];
+
+      const interactiveClasses = [
+        'sidebar__territory-card',
+        'sidebar__profile-item',
+        'sidebar__btn'
+      ];
+
+      const isInteractive = interactiveElements.includes(e.target.tagName) ||
+                           interactiveClasses.some(cls => e.target.closest(`.${cls}`));
+
+      // If clicking on empty space (not interactive elements), deselect territory
+      if (!isInteractive) {
+        console.log('📱 Empty sidebar space clicked - deselecting territory');
+        if (setActiveTerritoryId) {
+          setActiveTerritoryId(null);
+        }
+        if (setAddModeTerritoryId) {
+          setAddModeTerritoryId(null);
+        }
       }
     };
 
@@ -74,16 +158,18 @@ export default function Sidebar({
           <div className="sidebar__btn-row">
             <button
               type="button"
-              className="sidebar__btn sidebar__btn--primary"
+              className="sidebar__btn sidebar__btn--secondary"
               onClick={() => {
-                console.log('Save Profile As clicked');
-                onSaveProfile();
+                if (onClearTerritories) {
+                  onClearTerritories();
+                }
+                setShowLoadProfile(false);
               }}
-              disabled={savingProfile || loadingProfiles}
-              aria-label="Save profile as"
+              disabled={loadingProfiles || loadingProfile}
+              aria-label="Start new profile"
             >
-              <Save size={16} aria-hidden />
-              {savingProfile ? 'Saving...' : 'Save Profile As…'}
+              <FilePlus size={16} aria-hidden />
+              New Profile
             </button>
             <button
               type="button"
@@ -95,6 +181,19 @@ export default function Sidebar({
               <FolderOpen size={16} aria-hidden />
               {loadingProfiles ? 'Loading...' : 'Load Profile'}
             </button>
+            <button
+              type="button"
+              className="sidebar__btn sidebar__btn--primary"
+              onClick={() => {
+                console.log('Save Profile As clicked');
+                onSaveProfile();
+              }}
+              disabled={savingProfile || loadingProfiles}
+              aria-label="Save profile as"
+            >
+              <Save size={16} aria-hidden />
+              {savingProfile ? 'Saving...' : 'Save Profile As…'}
+            </button>
           </div>
           {showLoadProfile && (
             <div style={{ marginTop: '8px' }}>
@@ -103,30 +202,130 @@ export default function Sidebar({
               ) : savedProfiles.length === 0 ? (
                 <p className="sidebar__empty">No saved profiles yet</p>
               ) : (
-                <select
-                  className="sidebar__select"
-                  onChange={(e) => {
-                    if (e.target.value && !loadingProfile) {
-                      onLoadProfile(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  disabled={loadingProfile}
-                  aria-label="Choose a profile"
-                >
-                  <option value="">
-                    {loadingProfile ? 'Loading profile...' : 'Choose a profile...'}
-                  </option>
+                <div className="sidebar__profile-list">
                   {savedProfiles.map(profileName => (
-                    <option key={profileName} value={profileName}>
-                      {profileName}
-                    </option>
+                    <div key={profileName} className="sidebar__profile-item">
+                      {editingProfileName === profileName ? (
+                        <div className="sidebar__profile-edit">
+                          <input
+                            ref={editProfileInputRef}
+                            type="text"
+                            className="sidebar__profile-name-input"
+                            value={editingProfileNewName}
+                            onChange={(e) => setEditingProfileNewName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const trimmed = editingProfileNewName.trim();
+                                if (trimmed && onRenameProfile) {
+                                  onRenameProfile(profileName, trimmed);
+                                }
+                                setEditingProfileName(null);
+                                setEditingProfileNewName('');
+                              } else if (e.key === 'Escape') {
+                                setEditingProfileName(null);
+                                setEditingProfileNewName('');
+                              }
+                            }}
+                            onBlur={() => {
+                              const trimmed = editingProfileNewName.trim();
+                              if (trimmed && onRenameProfile) {
+                                onRenameProfile(profileName, trimmed);
+                              }
+                              setEditingProfileName(null);
+                              setEditingProfileNewName('');
+                            }}
+                            disabled={loadingProfile}
+                            aria-label={`Rename ${profileName}`}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="sidebar__profile-name"
+                            onClick={() => {
+                              if (!loadingProfile) {
+                                onLoadProfile(profileName);
+                              }
+                            }}
+                            disabled={loadingProfile}
+                            title={`Load profile: ${profileName}`}
+                          >
+                            {profileName}
+                          </button>
+                          <div className="sidebar__profile-actions">
+                            <button
+                              type="button"
+                              className="sidebar__profile-rename"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingProfileName(profileName);
+                                setEditingProfileNewName(profileName);
+                              }}
+                              disabled={loadingProfile}
+                              aria-label={`Rename ${profileName}`}
+                              title="Rename profile"
+                            >
+                              <Edit3 size={14} aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className="sidebar__profile-delete"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setProfileToDelete(profileName);
+                              }}
+                              disabled={loadingProfile}
+                              aria-label={`Delete ${profileName}`}
+                              title="Delete profile"
+                            >
+                              <X size={14} aria-hidden />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   ))}
-                </select>
+                </div>
               )}
             </div>
           )}
         </div>
+
+        {/* Delete Profile Confirmation Modal */}
+        {profileToDelete && (
+          <div className="sidebar__delete-modal-overlay">
+            <div className="sidebar__delete-modal">
+              <h3 className="sidebar__delete-modal-title">Delete Profile</h3>
+              <p className="sidebar__delete-modal-text">
+                Are you sure you want to delete the profile "{profileToDelete}"?
+                This action cannot be undone.
+              </p>
+              <div className="sidebar__delete-modal-actions">
+                <button
+                  type="button"
+                  className="sidebar__btn sidebar__btn--secondary"
+                  onClick={() => setProfileToDelete(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="sidebar__btn sidebar__btn--delete"
+                  onClick={() => {
+                    if (onDeleteProfile) {
+                      onDeleteProfile(profileToDelete);
+                    }
+                    setProfileToDelete(null);
+                  }}
+                >
+                  Delete Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="sidebar__section">
           <button
@@ -138,6 +337,11 @@ export default function Sidebar({
             <Plus size={18} aria-hidden />
             Create New Territory
           </button>
+        </div>
+
+        <div className="sidebar__current-profile">
+          <span className="sidebar__current-profile-label">Current Profile:</span>
+          <span className="sidebar__current-profile-name">{currentProfileName}</span>
         </div>
 
         <h3 className="sidebar__section-title">Territories ({territories.length})</h3>
@@ -159,7 +363,7 @@ export default function Sidebar({
                   <div
                     className={`sidebar__territory-card ${isActive ? 'active' : ''}`}
                     onClick={(e) => {
-                      if (e.target.closest('button') || e.target.closest('[role="button"]') || e.target.closest('input')) {
+                      if (e.target.closest('button') || e.target.closest('[role="button"]') || e.target.closest('input') || exportMode) {
                         return;
                       }
                       console.log('DEBUG: Territory clicked:', territory.name, 'id:', territory.id);
@@ -169,6 +373,24 @@ export default function Sidebar({
                     }}
                   >
                     <div className="sidebar__territory-header">
+                      {exportMode && (
+                        <input
+                          type="checkbox"
+                          className="sidebar__territory-checkbox"
+                          checked={selectedTerritoriesForExport.has(territory.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            const newSelected = new Set(selectedTerritoriesForExport);
+                            if (e.target.checked) {
+                              newSelected.add(territory.id);
+                            } else {
+                              newSelected.delete(territory.id);
+                            }
+                            setSelectedTerritoriesForExport(newSelected);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
                       <span className="sidebar__territory-name">
                         <span
                           className="sidebar__territory-dot"
@@ -222,7 +444,7 @@ export default function Sidebar({
                             aria-label={`Rename ${territory.name}`}
                             title="Rename territory"
                           >
-                            <Pencil size={14} aria-hidden />
+                            <Pencil size={12} aria-hidden />
                           </button>
                         )}
                         <button
@@ -234,7 +456,7 @@ export default function Sidebar({
                           }}
                           aria-label={`Delete ${territory.name}`}
                         >
-                          <Trash2 size={16} aria-hidden />
+                          <Trash2 size={14} aria-hidden />
                         </button>
                       </span>
                     </div>
@@ -279,44 +501,73 @@ export default function Sidebar({
         )}
 
         <div className="sidebar__bottom">
-          <button
-            type="button"
-            className={`sidebar__btn sidebar__btn--outline ${showBoundaries ? 'active' : ''}`}
-            onClick={() => setShowBoundaries(!showBoundaries)}
-            aria-label={showBoundaries ? 'Hide boundaries' : 'Show boundaries'}
-          >
-            {showBoundaries ? (
-              <>
-                <Eye size={18} aria-hidden />
-                Hide Boundaries
-              </>
-            ) : (
-              <>
-                <EyeOff size={18} aria-hidden />
-                Show Boundaries
-              </>
-            )}
-          </button>
+          {exportMode ? (
+            <>
+              <button
+                type="button"
+                className="sidebar__btn sidebar__btn--outline"
+                onClick={() => {
+                  setExportMode(false);
+                  setSelectedTerritoriesForExport(new Set());
+                }}
+              >
+                Cancel Export
+              </button>
+              <button
+                type="button"
+                className="sidebar__btn sidebar__btn--primary"
+                onClick={handleExport}
+                disabled={selectedTerritoriesForExport.size === 0}
+              >
+                <Download size={16} aria-hidden />
+                Export ({selectedTerritoriesForExport.size})
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={`sidebar__btn sidebar__btn--outline ${showBoundaries ? 'active' : ''}`}
+                onClick={() => setShowBoundaries(!showBoundaries)}
+                aria-label={showBoundaries ? 'Hide boundaries' : 'Show boundaries'}
+              >
+                {showBoundaries ? (
+                  <Eye size={18} aria-hidden />
+                ) : (
+                  <EyeOff size={18} aria-hidden />
+                )}
+                Boundaries
+              </button>
+
+              <button
+                type="button"
+                className="sidebar__btn sidebar__btn--outline"
+                onClick={() => setExportMode(true)}
+                title="Export territories to CSV"
+              >
+                <Download size={18} aria-hidden />
+                Export
+              </button>
+
+              {onThemeChange && (
+                <button
+                  type="button"
+                  className="sidebar__theme-btn"
+                  onClick={() => onThemeChange(theme === 'dark' ? 'light' : 'dark')}
+                  aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                >
+                  {theme === 'dark' ? (
+                    <Sun size={22} aria-hidden />
+                  ) : (
+                    <Moon size={22} aria-hidden />
+                  )}
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
-
-      {onThemeChange && (
-        <div className="sidebar__theme-corner">
-          <button
-            type="button"
-            className="sidebar__theme-btn"
-            onClick={() => onThemeChange(theme === 'dark' ? 'light' : 'dark')}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-          >
-            {theme === 'dark' ? (
-              <Sun size={22} aria-hidden />
-            ) : (
-              <Moon size={22} aria-hidden />
-            )}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

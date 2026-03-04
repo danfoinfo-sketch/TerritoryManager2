@@ -147,6 +147,7 @@ body {
   cursor: pointer;
   transition: background-color 0.2s, filter 0.2s;
   min-height: 40px;
+  box-sizing: border-box;
 }
 
 .sidebar__btn--primary {
@@ -265,6 +266,12 @@ body {
 
 .sidebar__territory-card:hover {
   background: var(--sidebar-hover);
+  color: var(--sidebar-text);
+}
+
+.sidebar__territory-card:hover .sidebar__territory-name,
+.sidebar__territory-card:hover .sidebar__territory-badge {
+  color: var(--sidebar-text);
 }
 
 .sidebar__territory-card.active {
@@ -278,6 +285,11 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+}
+
+.sidebar__territory-checkbox {
+  margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .sidebar__territory-name {
@@ -299,14 +311,18 @@ body {
 .sidebar__territory-header-actions {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
 }
 
 .sidebar__territory-rename {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--sidebar-text-muted);
@@ -343,7 +359,11 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--sidebar-text-muted);
@@ -387,32 +407,53 @@ body {
 }
 
 .sidebar__btn--green-sm {
-  background: var(--sidebar-border);
-  color: var(--sidebar-text);
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
 }
 
 .sidebar__btn--green-sm:hover:not(:disabled) {
-  background: var(--sidebar-hover);
+  background: #059669;
+  border-color: #059669;
 }
 
 .sidebar__btn--green-sm.active {
-  background: var(--sidebar-active);
+  background: #047857;
+  border-color: #047857;
 }
 
 .sidebar__btn--green-sm.active:hover:not(:disabled) {
-  background: var(--sidebar-hover);
+  background: #065f46;
+  border-color: #065f46;
+}
+
+/* Alternative green options based on color theory - currently using #10b981 (emerald)
+/* Option 1 - Brighter green: #22c55e (higher contrast) */
+/* Option 2 - Forest green: #16a34a (deeper, more natural) */
+/* Option 3 - Teal: #0d9488 (more blue-toned) */
+
+.sidebar__bottom {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar__bottom {
   margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
 }
 
-/* Sun/moon theme button - fixed in lower left corner of toolbar */
-.sidebar__theme-corner {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  z-index: 10;
+.sidebar__bottom .sidebar__btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .sidebar__theme-btn {
@@ -427,12 +468,15 @@ body {
   background: var(--sidebar-surface);
   color: var(--sidebar-text-muted);
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+  flex-shrink: 0;
+  opacity: 0;
 }
 
 .sidebar__theme-btn:hover {
   background: var(--sidebar-hover);
   color: var(--sidebar-text);
+  opacity: 1;
 }
 
 .sidebar__theme-btn:focus {
@@ -440,22 +484,206 @@ body {
   box-shadow: 0 0 0 2px var(--sidebar-active);
 }
 
-/* Light theme - same purple palette as dark, white toolbar background */
+/* Current Profile Display */
+.sidebar__current-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--sidebar-border);
+  font-size: 14px;
+}
+
+.sidebar__current-profile-label {
+  color: var(--sidebar-text-muted);
+  font-weight: 500;
+}
+
+.sidebar__current-profile-name {
+  color: var(--sidebar-text);
+  font-weight: 600;
+  text-align: right;
+  flex: 1;
+  margin-left: 8px;
+}
+
+/* Profile Management Styles */
+.sidebar__profile-list {
+  border: 1px solid var(--sidebar-border);
+  border-radius: 4px;
+  background: var(--sidebar-bg);
+}
+
+.sidebar__profile-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--sidebar-border);
+  gap: 8px;
+}
+
+.sidebar__profile-item:last-child {
+  border-bottom: none;
+}
+
+.sidebar__profile-name {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--sidebar-text);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar__profile-name:hover {
+  background: var(--sidebar-hover);
+}
+
+.sidebar__profile-name:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sidebar__profile-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar__profile-item:hover .sidebar__profile-actions {
+  opacity: 1;
+}
+
+.sidebar__profile-rename,
+.sidebar__profile-delete {
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  color: var(--sidebar-text-secondary);
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.sidebar__profile-rename:hover {
+  background: var(--sidebar-btn-secondary-bg);
+  color: var(--sidebar-btn-secondary-text);
+}
+
+.sidebar__profile-delete:hover {
+  background: var(--sidebar-btn-delete-bg);
+  color: var(--sidebar-btn-delete-text);
+}
+
+.sidebar__profile-rename:disabled,
+.sidebar__profile-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sidebar__profile-edit {
+  flex: 1;
+}
+
+.sidebar__profile-name-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--sidebar-btn-primary-border);
+  border-radius: 4px;
+  background: var(--sidebar-input-bg);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sidebar__profile-name-input:focus {
+  outline: 2px solid var(--sidebar-btn-primary-border);
+  outline-offset: 1px;
+}
+
+/* Delete Profile Confirmation Modal */
+.sidebar__delete-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.sidebar__delete-modal {
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar__delete-modal-title {
+  margin: 0 0 12px 0;
+  color: var(--sidebar-text);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.sidebar__delete-modal-text {
+  margin: 0 0 20px 0;
+  color: var(--sidebar-text);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.sidebar__delete-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.sidebar__btn--delete {
+  background: #dc2626;
+  color: white;
+  border: none;
+}
+
+.sidebar__btn--delete:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+/* Light theme - lighter purple palette for better contrast */
 .sidebar.sidebar--light {
   --sidebar-bg: #ffffff;
-  --sidebar-surface: rgba(109, 94, 252, 0.12);
-  --sidebar-border: #A78BFA;
-  --sidebar-text: #1E1438;
-  --sidebar-text-muted: #5B21B6;
-  --sidebar-active: #6D5EFC;
-  --sidebar-hover: #4A3BBF;
-  --sidebar-accent: #7C3AED;
+  --sidebar-surface: rgba(147, 51, 234, 0.08);
+  --sidebar-border: #C4B5FD;
+  --sidebar-text: #111827;
+  --sidebar-text-muted: #374151;
+  --sidebar-active: #A78BFA;
+  --sidebar-hover: #E9D5FF;
+  --sidebar-accent: #DDD6FE;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08) !important;
 }
 
 .sidebar.sidebar--light .sidebar__territory-delete:hover {
   color: #7C3AED;
-  background: rgba(124, 58, 237, 0.15);
+  background: rgba(196, 181, 253, 0.2);
 }
 
 /* Search bar */
@@ -484,11 +712,12 @@ body {
   font-size: 15px;
   padding: 6px 8px;
   background: transparent;
+  color: #0f172a;
   min-width: 0;
 }
 
 .search-bar__input::placeholder {
-  color: var(--sidebar-text-muted);
+  color: #64748b;
 }
 
 .search-bar__btn {

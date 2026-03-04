@@ -63,9 +63,11 @@ export function useTerritories(mapContainerRef) {
     console.log('🛠️ addZipToActiveTerritory function called with', zipStr, population, homes, 'targetTerritoryId:', targetTerritoryId, 'addModeTerritoryId:', addModeTerritoryId);
     if (!targetTerritoryId) {
       console.log('🛠️ No targetTerritoryId set, returning');
-      return;
+      return { action: 'none' };
     }
     console.log('🛠️ Adding ZIP to territory', targetTerritoryId);
+
+    let actionTaken = 'none';
 
     setTerritories(prevTerritories => {
       console.log('🛠️ setTerritories called with prevTerritories:', prevTerritories.map(t => ({ id: t.id, name: t.name, zips: t.zips.length })));
@@ -86,20 +88,19 @@ export function useTerritories(mapContainerRef) {
             if (existingIndex === -1) {
               // ZIP not in territory - add it
               console.log('🛠️ Adding ZIP', zipStr, 'to territory', t.name);
+              actionTaken = 'added';
               return { ...t, zips: [...t.zips, { zip: zipStr, pop: population, standAloneHouses: homes }] };
             } else if (updateExisting) {
               // ZIP exists and we're updating data - update it
               console.log('🛠️ Updating ZIP', zipStr, 'data in territory', t.name, 'population:', population, 'homes:', homes);
+              actionTaken = 'updated';
               const newZips = [...t.zips];
               newZips[existingIndex] = { zip: zipStr, pop: population, standAloneHouses: homes };
               return { ...t, zips: newZips };
-            } else if (territoryId) {
-              // Add mode: ZIP already in territory, do not toggle off – leave as-is (or could update if we had data)
-              console.log('🛠️ Add mode: ZIP', zipStr, 'already in territory', t.name, '- keeping');
-              return t;
             } else {
-              // Not in add mode: toggle remove
+              // ZIP exists: toggle remove (works in both add mode and normal mode)
               console.log('🛠️ Removing ZIP', zipStr, 'from territory', t.name);
+              actionTaken = 'removed';
               const newZips = [...t.zips];
               newZips.splice(existingIndex, 1);
               return { ...t, zips: newZips };
@@ -108,7 +109,15 @@ export function useTerritories(mapContainerRef) {
           : t
       );
     });
+
+    return { action: actionTaken };
   }, [addModeTerritoryId]);
+
+  const clearTerritories = useCallback(() => {
+    setTerritories([]);
+    setActiveTerritoryId(null);
+    setAddModeTerritoryId(null);
+  }, []);
 
   const getTerritoryStats = useCallback((territory) => {
     const zipPop = territory.zips.reduce((sum, z) => sum + (z.pop || 0), 0);
@@ -134,6 +143,7 @@ export function useTerritories(mapContainerRef) {
     handleSetAddModeTerritoryId,
     handleToggleTerritoryVisibility,
     addZipToActiveTerritory,
+    clearTerritories,
     getTerritoryStats,
 
     // State setters (for compatibility)

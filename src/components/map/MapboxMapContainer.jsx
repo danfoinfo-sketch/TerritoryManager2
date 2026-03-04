@@ -112,13 +112,21 @@ export default forwardRef(function MapboxMapContainer({
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
+    console.log('🎨 Territory highlighting update - activeTerritoryId:', activeTerritoryId, 'addModeTerritoryId:', addModeTerritoryId);
+
     const territoryToHighlight = addModeTerritoryId
       ? territories.find(t => t.id === addModeTerritoryId)
       : activeTerritoryId
         ? territories.find(t => t.id === activeTerritoryId)
         : null;
-    if (!territoryToHighlight) return;
-    const zips = (territoryToHighlight.zips || []).map(z => String(z.zip ?? z));
+
+    // If no territory is selected, show all territories; otherwise show the selected territory
+    const zips = territoryToHighlight
+      ? (territoryToHighlight.zips || []).map(z => String(z.zip ?? z))
+      : territories.flatMap(t => (t.zips || []).map(z => String(z.zip ?? z)));
+
+    console.log('🎨 Highlighting zips:', zips.length, territoryToHighlight ? 'single territory' : 'all territories');
+
     const map = mapRef.current.getMap();
     const layers = ['zip-highlight', 'territory-mask', 'territory-perimeter'];
     const filter = ['in', ['to-string', ['get', ZIP_PROPERTY]], ['literal', zips]];
@@ -196,6 +204,11 @@ export default forwardRef(function MapboxMapContainer({
         mapboxAccessToken={MAPBOX_CONFIG.ACCESS_TOKEN}
         initialViewState={viewport}
         onMove={handleViewportChange}
+        onClick={(e) => {
+          // Prevent map clicks from affecting territory selection
+          console.log('🗺️ Map clicked at:', e.lngLat, 'features:', e.features);
+          // Don't allow map clicks to clear territory selection
+        }}
         style={{ width: '100%', height: '100%', minHeight: '400px', minWidth: '400px' }}
         mapStyle="mapbox://styles/mapbox/navigation-guidance-day-v1"
         onLoad={() => {

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { collection, setDoc, getDocs, getDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, setDoc, getDocs, getDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export function useProfiles(territories) {
@@ -116,6 +116,96 @@ export function useProfiles(territories) {
     }
   }, []);
 
+  // Delete profile from Firestore
+  const deleteProfile = useCallback(async (profileName) => {
+    if (!profileName) return;
+
+    try {
+      // First, find the actual document ID by searching through all documents
+      const allDocs = await getDocs(collection(db, 'profiles'));
+      let targetDocId = null;
+
+      for (const doc of allDocs.docs) {
+        if (doc.data().name === profileName) {
+          targetDocId = doc.id;
+          break;
+        }
+      }
+
+      if (!targetDocId) {
+        alert(`Profile "${profileName}" not found. It may have already been deleted.`);
+        // Still reload to refresh the UI
+        await loadSavedProfiles();
+        return;
+      }
+
+      const profileRef = doc(db, 'profiles', targetDocId);
+      await deleteDoc(profileRef);
+
+      // Reload profiles list
+      await loadSavedProfiles();
+
+    } catch (error) {
+      console.error('Error deleting profile:', error);
+      alert('Error deleting profile. Please try again.');
+    }
+  }, [loadSavedProfiles]);
+
+  // Rename profile in Firestore
+  const renameProfile = useCallback(async (oldProfileName, newProfileName) => {
+    const trimmedNewName = newProfileName.trim();
+    if (!oldProfileName || !trimmedNewName) return;
+
+    if (oldProfileName === trimmedNewName) return; // No change
+
+    try {
+      // Convert names to document ID format
+      const oldDocId = oldProfileName.toLowerCase().replace(/\s+/g, '-');
+      const newDocId = trimmedNewName.toLowerCase().replace(/\s+/g, '-');
+
+      // Get the old profile data
+      const oldProfileRef = doc(db, 'profiles', oldDocId);
+      const oldProfileSnap = await getDoc(oldProfileRef);
+
+      if (!oldProfileSnap.exists()) {
+        alert(`Profile "${oldProfileName}" not found.`);
+        return;
+      }
+
+      // Check if new name already exists (different document)
+      if (oldDocId !== newDocId) {
+        const newProfileRef = doc(db, 'profiles', newDocId);
+        const newProfileSnap = await getDoc(newProfileRef);
+
+        if (newProfileSnap.exists()) {
+          alert(`A profile with the name "${trimmedNewName}" already exists.`);
+          return;
+        }
+      }
+
+      const profileData = oldProfileSnap.data();
+
+      // Create new document with updated name
+      const newProfileRef = doc(db, 'profiles', newDocId);
+      await setDoc(newProfileRef, {
+        ...profileData,
+        name: trimmedNewName,
+        updatedAt: serverTimestamp()
+      });
+
+      // Delete old document
+      await deleteDoc(oldProfileRef);
+
+      // Reload profiles list
+      await loadSavedProfiles();
+
+      console.log(`Profile renamed from "${oldProfileName}" to "${trimmedNewName}" successfully!`);
+    } catch (error) {
+      console.error('Error renaming profile:', error);
+      alert('Error renaming profile. Please try again.');
+    }
+  }, [loadSavedProfiles]);
+
   // Open save profile modal
   const openSaveProfileModal = useCallback(() => {
     console.log('Opening save profile modal');
@@ -142,6 +232,8 @@ export function useProfiles(territories) {
     saveProfile,
     loadProfile,
     loadSavedProfiles,
+    deleteProfile,
+    renameProfile,
     openSaveProfileModal,
 
     // State setters

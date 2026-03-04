@@ -41,25 +41,49 @@ export function useMapEventHandlers({
 
     try {
       console.log('🖱️ Adding ZIP immediately with placeholder data:', zipStr);
-      addZipToActiveTerritory(zipStr, 0, 0, localAddModeTerritoryIdRef.current);
+      const result = addZipToActiveTerritory(zipStr, 0, 0, localAddModeTerritoryIdRef.current);
+      const action = result?.action || 'none';
 
-      fetchZipPopulationAndHouses(zipStr).then(censusData => {
-        console.log('🖱️ Got real census data asynchronously:', zipStr, censusData);
-        addZipToActiveTerritory(zipStr, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current, true);
-        setPopupInfo(currentPopup => {
-          if (currentPopup && currentPopup.zip === zipStr) {
-            return { ...currentPopup, population: censusData.population, standAloneHouses: censusData.standAloneHouses, estimated: false, loading: false };
-          }
-          return currentPopup;
+      // Fetch census data asynchronously if ZIP was added (not removed)
+      // This ensures tooltips and sidebar totals show real data
+      if (action === 'added') {
+        fetchZipPopulationAndHouses(zipStr).then(censusData => {
+          console.log('🖱️ Got real census data asynchronously:', zipStr, censusData);
+          addZipToActiveTerritory(zipStr, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current, true);
+          setPopupInfo(currentPopup => {
+            if (currentPopup && currentPopup.zip === zipStr) {
+              return { ...currentPopup, population: censusData.population, standAloneHouses: censusData.standAloneHouses, estimated: false, loading: false };
+            }
+            return currentPopup;
+          });
+        }).catch(() => {
+          setPopupInfo(currentPopup => {
+            if (currentPopup && currentPopup.zip === zipStr) {
+              return { ...currentPopup, population: 0, standAloneHouses: 0, estimated: true, loading: false };
+            }
+            return currentPopup;
+          });
         });
-      }).catch(() => {
-        setPopupInfo(currentPopup => {
-          if (currentPopup && currentPopup.zip === zipStr) {
-            return { ...currentPopup, population: 0, standAloneHouses: 0, estimated: true, loading: false };
-          }
-          return currentPopup;
+      } else if (!localAddModeTerritoryIdRef.current) {
+        // In normal mode (not add mode), always fetch census data for tooltips
+        fetchZipPopulationAndHouses(zipStr).then(censusData => {
+          console.log('🖱️ Got real census data asynchronously:', zipStr, censusData);
+          addZipToActiveTerritory(zipStr, censusData.population, censusData.standAloneHouses, localAddModeTerritoryIdRef.current, true);
+          setPopupInfo(currentPopup => {
+            if (currentPopup && currentPopup.zip === zipStr) {
+              return { ...currentPopup, population: censusData.population, standAloneHouses: censusData.standAloneHouses, estimated: false, loading: false };
+            }
+            return currentPopup;
+          });
+        }).catch(() => {
+          setPopupInfo(currentPopup => {
+            if (currentPopup && currentPopup.zip === zipStr) {
+              return { ...currentPopup, population: 0, standAloneHouses: 0, estimated: true, loading: false };
+            }
+            return currentPopup;
+          });
         });
-      });
+      }
 
       if (localAddModeTerritoryIdRef.current) {
         setPopupInfo({ zip: zipStr, lngLat: e.lngLat, population: 0, standAloneHouses: 0, estimated: true });
