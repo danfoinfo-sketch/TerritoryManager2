@@ -59,11 +59,18 @@ export default function Sidebar({
 
   // Generate and download CSV export
   const handleExport = () => {
-    if (selectedTerritoriesForExport.size === 0) return;
+    console.log('🚀 Starting CSV export...');
+    console.log('📊 Selected territories:', selectedTerritoriesForExport.size);
+
+    if (selectedTerritoriesForExport.size === 0) {
+      console.log('❌ No territories selected, aborting export');
+      return;
+    }
 
     const csvData = [];
     // Add header
     csvData.push(['Profile', 'Territory Title', 'Population', 'Homes', 'ZIP Count', 'ZIP Codes']);
+    console.log('📝 Added CSV header');
 
     // Add data for each selected territory
     selectedTerritoriesForExport.forEach(territoryId => {
@@ -71,7 +78,10 @@ export default function Sidebar({
       if (territory) {
         const pop = territory.zips.reduce((sum, z) => sum + (z.pop || 0), 0);
         const homes = territory.zips.reduce((sum, z) => sum + (z.standAloneHouses || 0), 0);
-        const zipCodes = territory.zips.map(z => z.zip).join('; ');
+        const zipCodes = territory.zips.map(z => z.zip).join(',');
+        console.log(`📍 Territory "${territory.name}": ${territory.zips.length} ZIPs -> "${zipCodes}"`);
+        console.log('🔍 ZIP codes array:', territory.zips.map(z => z.zip));
+        console.log('🔍 Join separator test:', ['a','b','c'].join(','));
 
         csvData.push([
           currentProfileName,
@@ -89,6 +99,8 @@ export default function Sidebar({
       row.map(field => `"${field}"`).join(',')
     ).join('\n');
 
+    console.log('📄 Generated CSV content preview:', csvContent.substring(0, 200) + '...');
+
     // Create and download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -99,6 +111,8 @@ export default function Sidebar({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    console.log('✅ CSV export completed and file downloaded');
 
     // Exit export mode
     setExportMode(false);
