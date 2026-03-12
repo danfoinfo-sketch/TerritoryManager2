@@ -63,7 +63,7 @@ export default function Sidebar({
 
     const csvData = [];
     // Add header
-    csvData.push(['Profile', 'Territory Title', 'Population', 'Homes', 'ZIP Count', 'ZIPs']);
+    csvData.push(['Profile', 'Territory Title', 'Population', 'Homes', 'ZIP Count', 'ZIP Codes']);
 
     // Add data for each selected territory
     selectedTerritoriesForExport.forEach(territoryId => {
